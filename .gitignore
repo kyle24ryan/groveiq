@@ -3,3 +3,5 @@ node_modules/
 .dev.vars
 .env
 dist/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
