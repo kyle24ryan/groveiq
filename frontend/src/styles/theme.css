@@ -1,23 +1,74 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --linen: #E9E4D6;
-  --paper: #F5F1E6;
-  --moss: #3F5B45;
-  --amber: #B8863A;
-  --brick: #8C4433;
-  --clay: #8C5836;
+  /* Surfaces */
+  --canvas: #FAFAF8;
+  --sidebar: #F4F4F2;
+  --surface: #FFFFFF;
+  --surface-translucent: rgba(255, 255, 255, 0.7);
 
-  --ink: #2B2620;
-  --ink-soft: #6B6255;
-  --border: #DAD3C2;
+  /* Text */
+  --ink: #18181B;
+  --ink-soft: #6B7280;
+  --ink-faint: #9CA3AF;
 
-  --font-display: 'Fraunces', serif;
-  --font-body: 'Public Sans', sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+  /* Borders */
+  --border: #E5E7EB;
+  --border-strong: #D4D4D8;
 
+  /* Semantic state */
+  --ok: #2F6D4F;
+  --ok-bg: #EAF3EE;
+  --watch: #B45309;
+  --watch-bg: #FDF3E7;
+  --urgent: #B91C1C;
+  --urgent-bg: #FCEAEA;
+  --neutral: #9CA3AF;
+  --neutral-bg: #F3F4F6;
+
+  /* Intelligence / forecast accent */
+  --insight: #5B5BD6;
+  --insight-bg: #EEEEFB;
+
+  /* Brand accent (restrained) */
+  --brand: #2F6D4F;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+
+  --radius-sm: 6px;
   --radius: 10px;
-  --shadow-card: 0 1px 2px rgba(43, 38, 32, 0.06), 0 1px 8px rgba(43, 38, 32, 0.04);
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #121214;
+    --sidebar: #0D0D0F;
+    --surface: #1A1A1D;
+    --surface-translucent: rgba(26, 26, 29, 0.7);
+
+    --ink: #F4F4F5;
+    --ink-soft: #A1A1AA;
+    --ink-faint: #71717A;
+
+    --border: #27272A;
+    --border-strong: #3F3F46;
+
+    --ok: #4ADE80;
+    --ok-bg: rgba(74, 222, 128, 0.12);
+    --watch: #FBBF24;
+    --watch-bg: rgba(251, 191, 36, 0.12);
+    --urgent: #F87171;
+    --urgent-bg: rgba(248, 113, 113, 0.12);
+    --neutral: #71717A;
+    --neutral-bg: rgba(113, 113, 122, 0.12);
+
+    --insight: #A5A6F6;
+    --insight-bg: rgba(165, 166, 246, 0.12);
+
+    --brand: #4ADE80;
+  }
 }
 
 * {
@@ -30,36 +81,66 @@ html, body, #root {
 
 body {
   margin: 0;
-  background: var(--linen);
+  background: var(--canvas);
   color: var(--ink);
-  font-family: var(--font-body);
+  font-family: var(--font-sans);
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4 {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-weight: 600;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .mono {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 a {
   color: inherit;
 }
 
-.status-ok { color: var(--moss); }
-.status-watch { color: var(--amber); }
-.status-urgent { color: var(--brick); }
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--insight);
+  outline-offset: 2px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-ok { color: var(--ok); }
+.status-watch { color: var(--watch); }
+.status-urgent { color: var(--urgent); }
+.status-neutral { color: var(--neutral); }
 
 .status-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
-.status-dot.status-ok { background: var(--moss); }
-.status-dot.status-watch { background: var(--amber); }
-.status-dot.status-urgent { background: var(--brick); }
+.status-dot.status-ok { background: var(--ok); }
+.status-dot.status-watch { background: var(--watch); }
+.status-dot.status-urgent { background: var(--urgent); }
+.status-dot.status-neutral { background: var(--neutral); }
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

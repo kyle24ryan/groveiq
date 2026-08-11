@@ -1,15 +1,18 @@
 import type { Status } from '../data/types';
 
 const labels: Record<Status, string> = {
-  ok: 'OK',
+  ok: 'Healthy',
   watch: 'Watch',
-  urgent: 'Urgent',
+  urgent: 'Attention',
 };
 
-export function StatusBadge({ status }: { status: Status }) {
+export function StatusBadge({ status, size = 'md' }: { status: Status; size?: 'sm' | 'md' }) {
   return (
-    <span className={`status-${status}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-      <span className={`status-dot status-${status}`} />
+    <span
+      className={`status-${status}`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: size === 'sm' ? 12 : 13, fontWeight: 500 }}
+    >
+      <span className={`status-dot status-${status}`} aria-hidden="true" />
       {labels[status]}
     </span>
   );

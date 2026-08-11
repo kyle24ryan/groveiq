@@ -12,7 +12,7 @@ const fields: { key: keyof (typeof speciesReference)[number]; label: string }[] 
   { key: 'wiringGuidance', label: 'Wiring guidance' },
   { key: 'stylingNotes', label: 'Styling notes' },
   { key: 'seasonalCalendar', label: 'Seasonal calendar' },
-  { key: 'aiNotes', label: "Sensei's notes" },
+  { key: 'aiNotes', label: 'AI notes' },
   { key: 'pnwNotes', label: 'PNW notes' },
 ];
 
@@ -37,18 +37,18 @@ export function SpeciesReference() {
           <Link to="/species" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
             ← Species
           </Link>
-          <h1 style={{ fontSize: 28, marginTop: 8 }}>{entry.commonName}</h1>
-          <div style={{ fontStyle: 'italic', color: 'var(--ink-soft)', fontSize: 15 }}>{entry.scientificName}</div>
+          <h1 style={{ fontSize: 22, marginTop: 8 }}>{entry.commonName}</h1>
+          <div style={{ fontStyle: 'italic', color: 'var(--ink-soft)', fontSize: 14 }}>{entry.scientificName}</div>
           <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 6 }}>
             Trees: {relatedTrees.map((t) => t.name).join(', ')}
           </div>
         </div>
         {fields.map(({ key, label }) => (
           <Card key={key}>
-            <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ink-soft)', marginBottom: 6 }}>
+            <div className="eyebrow" style={{ marginBottom: 6 }}>
               {label}
             </div>
-            <p style={{ fontSize: 14, lineHeight: 1.5 }}>{entry[key]}</p>
+            <p style={{ fontSize: 13.5, lineHeight: 1.5 }}>{entry[key]}</p>
           </Card>
         ))}
       </div>
@@ -58,8 +58,8 @@ export function SpeciesReference() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 900 }}>
       <div>
-        <h1 style={{ fontSize: 28 }}>Species Reference</h1>
-        <p style={{ color: 'var(--ink-soft)', marginTop: 4 }}>Care guides for every species in the collection.</p>
+        <h1 style={{ fontSize: 24 }}>Species</h1>
+        <p style={{ color: 'var(--ink-soft)', marginTop: 4, fontSize: 14 }}>Care guides for every species in the collection.</p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
         {speciesReference.map((entry) => {
@@ -67,7 +67,7 @@ export function SpeciesReference() {
           return (
             <Link key={entry.species} to={`/species/${encodeURIComponent(entry.species)}`} style={{ textDecoration: 'none', color: 'inherit' }}>
               <Card style={{ height: '100%' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 600 }}>{entry.commonName}</div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>{entry.commonName}</div>
                 <div style={{ fontStyle: 'italic', color: 'var(--ink-soft)', fontSize: 13, marginTop: 2 }}>{entry.scientificName}</div>
                 <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 10 }}>
                   {relatedTrees.length} tree{relatedTrees.length !== 1 ? 's' : ''}: {relatedTrees.map((t) => t.name).join(', ')}

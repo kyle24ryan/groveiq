@@ -4,10 +4,9 @@ export function Card({ children, style }: { children: ReactNode; style?: CSSProp
   return (
     <div
       style={{
-        background: 'var(--paper)',
+        background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
-        boxShadow: 'var(--shadow-card)',
         padding: 20,
         ...style,
       }}

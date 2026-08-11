@@ -85,3 +85,16 @@ export type Forecast = {
   precipChancePct: number;
   frostRisk: boolean;
 };
+
+export type Insight = {
+  id: string;
+  treeId: string | null;
+  status: Status;
+  title: string;
+  evidence: string;
+  comparison?: string;
+  likelyCause?: string;
+  implication?: string;
+  action?: string;
+  ts: string;
+};

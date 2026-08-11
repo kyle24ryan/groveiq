@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { Overview } from './screens/Overview';
+import { Grove } from './screens/Grove';
+import { Trees } from './screens/Trees';
 import { TreeDetail } from './screens/TreeDetail';
-import { TimeMachine } from './screens/TimeMachine';
-import { Weather } from './screens/Weather';
+import { Environment } from './screens/Environment';
+import { Timeline } from './screens/Timeline';
+import { Insights } from './screens/Insights';
 import { Settings } from './screens/Settings';
 import { SpeciesReference } from './screens/SpeciesReference';
 
@@ -12,12 +14,14 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<Overview />} />
+          <Route index element={<Grove />} />
+          <Route path="trees" element={<Trees />} />
           <Route path="trees/:treeId" element={<TreeDetail />} />
           <Route path="species" element={<SpeciesReference />} />
           <Route path="species/:species" element={<SpeciesReference />} />
-          <Route path="time-machine" element={<TimeMachine />} />
-          <Route path="weather" element={<Weather />} />
+          <Route path="environment" element={<Environment />} />
+          <Route path="timeline" element={<Timeline />} />
+          <Route path="insights" element={<Insights />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

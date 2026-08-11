@@ -1,4 +1,4 @@
-import type { Analysis, Conditions, DailyReading, Forecast, Milestone, SpeciesReference, Status, Tree } from './types';
+import type { Conditions, DailyReading, Forecast, Insight, Milestone, SpeciesReference, Status, Tree } from './types';
 
 // Grove Collection — Kyle Ryan, North Bend, WA. Mirrors migrations/0001_real_trees_and_species.sql.
 export const trees: Tree[] = [
@@ -190,26 +190,39 @@ function seedFromString(s: string) {
   return h || 1;
 }
 
+// Hash a (seed, dayIndex) pair to a stable 0..1 value. Anchoring noise to the
+// calendar day (not loop position) means any requested window length agrees
+// on the value for a given date — required for cross-screen consistency.
+function dayNoise(seed: number, dayIndex: number): number {
+  let h = (seed ^ dayIndex) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 2246822507);
+  h = Math.imul(h ^ (h >>> 13), 3266489909);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967295;
+}
+
 export function dailyReadingsFor(treeId: string, days = 30): DailyReading[] {
-  const rand = seededRandom(seedFromString(treeId));
+  const seed = seedFromString(treeId);
   const readings: DailyReading[] = [];
-  let moisture = 55 + rand() * 10;
   const today = new Date();
 
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-    moisture += (rand() - 0.55) * 4;
-    moisture = Math.max(20, Math.min(80, moisture));
-    const spread = 3 + rand() * 4;
+    const dayIndex = Math.floor(date.getTime() / 86400000);
+
+    const moisture = Math.max(20, Math.min(80, 55 + Math.sin(dayIndex / 9 + seed) * 10 + (dayNoise(seed, dayIndex) - 0.5) * 8));
+    const spread = 3 + dayNoise(seed + 1, dayIndex) * 4;
+    const soilTemp = 16 + dayNoise(seed + 2, dayIndex) * 6;
+    const soilEc = 1.2 + dayNoise(seed + 3, dayIndex) * 0.8;
 
     readings.push({
       date: date.toISOString().slice(0, 10),
       soilMoistureAvg: Math.round(moisture * 10) / 10,
       soilMoistureMin: Math.round((moisture - spread) * 10) / 10,
       soilMoistureMax: Math.round((moisture + spread) * 10) / 10,
-      soilTempAvg: Math.round((16 + rand() * 6) * 10) / 10,
-      soilEcAvg: Math.round((1.2 + rand() * 0.8) * 100) / 100,
+      soilTempAvg: Math.round(soilTemp * 10) / 10,
+      soilEcAvg: Math.round(soilEc * 100) / 100,
     });
   }
   return readings;
@@ -223,37 +236,88 @@ export function statusFor(treeId: string): Status {
   return 'ok';
 }
 
-const summaries: Record<Status, string[]> = {
-  ok: [
-    'Moisture steady, no action needed today.',
-    'Conditions look comfortable — nothing to do.',
-    'Holding well since the last watering.',
-  ],
+const likelyCauses: Record<Status, string[]> = {
+  ok: ['Stable weather and consistent watering cadence.'],
   watch: [
-    'Worth watering before the weekend.',
-    'Drying a bit faster than usual this week.',
-    'EC trending up slightly — keep an eye on it.',
+    'Higher temperatures and wind likely contributed.',
+    'Longer stretch between waterings than usual.',
+    'Rising EC suggests it may be due for a flush.',
   ],
-  urgent: [
-    'Soil moisture below threshold — water today.',
-    'Sharp drop overnight, check on this one soon.',
-  ],
+  urgent: ['A warm, dry stretch combined with a missed watering.', 'Faster-than-expected drainage after the last watering.'],
 };
 
-export function latestAnalysisFor(treeId: string): Analysis {
+const actions: Record<Status, string | undefined> = {
+  ok: undefined,
+  watch: 'Plan to water within the next day or two.',
+  urgent: 'Water today and recheck this evening.',
+};
+
+export function insightFor(treeId: string): Insight {
   const status = statusFor(treeId);
-  const rand = seededRandom(seedFromString(treeId + 'analysis'));
-  const options = summaries[status];
-  const summary = options[Math.floor(rand() * options.length)];
+  const readings = dailyReadingsFor(treeId, 15);
+  const latest = readings[readings.length - 1];
+  const previous = readings[readings.length - 2];
+  const baselineAvg = readings.slice(0, 14).reduce((sum, r) => sum + r.soilMoistureAvg, 0) / 14;
+  const overnightDeltaPct = Math.round(((latest.soilMoistureAvg - previous.soilMoistureAvg) / previous.soilMoistureAvg) * 1000) / 10;
+  const baselineDeltaPct = Math.round(((latest.soilMoistureAvg - baselineAvg) / baselineAvg) * 1000) / 10;
+  const rand = seededRandom(seedFromString(treeId + 'insight'));
+
+  const titles: Record<Status, string> = {
+    ok: 'GroveIQ: conditions are stable.',
+    watch: 'GroveIQ detected faster-than-usual drying.',
+    urgent: 'GroveIQ detected unusual drying overnight.',
+  };
+
+  const evidence =
+    status === 'ok'
+      ? `Soil moisture at ${latest.soilMoistureAvg}%, within ${Math.abs(baselineDeltaPct)}% of its 14-day baseline.`
+      : `Soil moisture fell ${Math.abs(overnightDeltaPct)}% overnight to ${latest.soilMoistureAvg}%.`;
+
+  const comparison =
+    status === 'ok'
+      ? undefined
+      : `${Math.abs(baselineDeltaPct / (overnightDeltaPct || 1)).toFixed(1)}x faster than its 14-day baseline rate.`;
+
+  const causeOptions = likelyCauses[status];
+  const likelyCause = status === 'ok' ? undefined : causeOptions[Math.floor(rand() * causeOptions.length)];
+
+  const hoursToThreshold = Math.max(2, Math.round(12 + rand() * 10));
+  const thresholdTime = new Date();
+  thresholdTime.setHours(thresholdTime.getHours() + hoursToThreshold);
+  const implication =
+    status === 'urgent'
+      ? `May reach its moisture threshold around ${thresholdTime.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} if untreated.`
+      : status === 'watch'
+        ? 'Likely to cross its low threshold within 2-3 days at the current rate.'
+        : undefined;
+
   return {
-    id: seedFromString(treeId) % 100000,
+    id: `${treeId}-insight`,
     treeId,
-    kind: 'sensor',
     status,
-    summary,
-    detail: `${summary} Based on the last 7 days of soil moisture, temperature, and EC readings compared against this tree's species thresholds.`,
+    title: titles[status],
+    evidence,
+    comparison,
+    likelyCause,
+    implication,
+    action: actions[status],
     ts: new Date().toISOString(),
   };
+}
+
+export function allInsights(): Insight[] {
+  return trees.map((t) => insightFor(t.id)).sort((a, b) => {
+    const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
+    return rank[a.status] - rank[b.status];
+  });
+}
+
+export function lastWateredFor(treeId: string): string {
+  const rand = seededRandom(seedFromString(treeId + 'watered'));
+  const hoursAgo = Math.floor(6 + rand() * 60);
+  const days = Math.floor(hoursAgo / 24);
+  const hours = hoursAgo % 24;
+  return days > 0 ? `${days}d ${hours}h ago` : `${hours}h ago`;
 }
 
 export function milestonesFor(treeId: string): Milestone[] {
@@ -284,6 +348,41 @@ export const currentConditions: Conditions = {
   blackGlobeTempC: 27,
   pm25: 8,
 };
+
+// Tetens formula: saturation vapor pressure (kPa) from temp (C); VPD = es * (1 - RH/100).
+export function vpdKPa(tempC = currentConditions.outdoorTempC, humidityPct = currentConditions.humidityPct): number {
+  const es = 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3));
+  return Math.round(es * (1 - humidityPct / 100) * 100) / 100;
+}
+
+export type HourlyPoint = { hour: string; tempC: number; humidityPct: number; windMph: number; solarWm2: number; rainIn: number };
+
+export function hourlyConditionsToday(): HourlyPoint[] {
+  const rand = seededRandom(7);
+  const points: HourlyPoint[] = [];
+  for (let h = 0; h < 24; h++) {
+    const dayCurve = Math.sin(((h - 6) / 24) * Math.PI * 2) * 0.5 + 0.5;
+    const tempC = 12 + dayCurve * 12 + (rand() - 0.5) * 1.5;
+    const humidityPct = 80 - dayCurve * 30 + (rand() - 0.5) * 5;
+    const solarWm2 = h >= 6 && h <= 20 ? Math.max(0, Math.sin(((h - 6) / 14) * Math.PI)) * (750 + rand() * 100) : 0;
+    points.push({
+      hour: `${h.toString().padStart(2, '0')}:00`,
+      tempC: Math.round(tempC * 10) / 10,
+      humidityPct: Math.round(Math.max(30, Math.min(95, humidityPct))),
+      windMph: Math.round((3 + rand() * 8) * 10) / 10,
+      solarWm2: Math.round(solarWm2),
+      rainIn: 0,
+    });
+  }
+  return points;
+}
+
+export function waterDemandNow(): { label: string; tone: 'ok' | 'watch' | 'urgent' } {
+  const vpd = vpdKPa();
+  if (vpd > 1.6) return { label: 'High', tone: 'urgent' };
+  if (vpd > 0.9) return { label: 'Moderate', tone: 'watch' };
+  return { label: 'Low', tone: 'ok' };
+}
 
 export function forecastNext7Days(): Forecast[] {
   const rand = seededRandom(42);
