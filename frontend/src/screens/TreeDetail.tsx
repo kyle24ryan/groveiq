@@ -1,8 +1,8 @@
 import { useParams, Link } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
 import { GrowthRing } from '../components/GrowthRing';
+import { ReadingChart } from '../components/ReadingChart';
 import { trees, dailyReadingsFor, latestAnalysisFor, statusFor, milestonesFor } from '../data/mockData';
 
 export function TreeDetail() {
@@ -99,26 +99,41 @@ export function TreeDetail() {
 
       <Card>
         <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ink-soft)', marginBottom: 12 }}>
-          Soil moisture — last 30 days
+          Photo strip
         </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={readings}>
-            <defs>
-              <linearGradient id="moistureGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--moss)" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="var(--moss)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid stroke="var(--border)" vertical={false} />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} tickFormatter={(d) => d.slice(5)} minTickGap={24} />
-            <YAxis tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} width={32} />
-            <Tooltip
-              contentStyle={{ background: 'var(--paper)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
-            />
-            <Area type="monotone" dataKey="soilMoistureAvg" stroke="var(--moss)" fill="url(#moistureGradient)" strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto' }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                flex: '0 0 auto',
+                width: 120,
+                aspectRatio: '4 / 3',
+                background: 'var(--linen)',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--ink-soft)',
+                fontSize: 11,
+                textAlign: 'center',
+                padding: 8,
+              }}
+            >
+              No capture yet
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 10 }}>
+          Weekly automated captures will appear here once the Reolink camera is installed.
+        </p>
       </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <ReadingChart title="Soil moisture — last 30 days" data={readings} dataKey="soilMoistureAvg" color="var(--moss)" unit="%" />
+        <ReadingChart title="Soil temperature — last 30 days" data={readings} dataKey="soilTempAvg" color="var(--clay)" unit="°C" />
+      </div>
+      <ReadingChart title="Soil EC — last 30 days" data={readings} dataKey="soilEcAvg" color="var(--amber)" />
 
       <Card>
         <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ink-soft)', marginBottom: 12 }}>
