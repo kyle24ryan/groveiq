@@ -60,7 +60,7 @@ export const trees: Tree[] = [
   {
     id: 'silver-fir',
     name: 'Silver Fir',
-    nickname: null,
+    nickname: 'Tipsoo',
     species: 'Silver Fir',
     potSizeLiters: null,
     originNotes: 'Nursery-grown.',

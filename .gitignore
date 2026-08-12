@@ -5,3 +5,5 @@ node_modules/
 dist/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+firmware/**/include/secrets.h
+firmware/**/.pio/

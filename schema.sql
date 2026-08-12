@@ -309,7 +309,7 @@ VALUES
   38, 78, 2.2, 6
 ),
 (
-  'silver-fir', 'Silver Fir', NULL, 'Silver Fir', NULL,
+  'silver-fir', 'Silver Fir', 'Tipsoo', 'Silver Fir', NULL,
   'Nursery-grown.', 'nursery', NULL,
   3, 5, 'development',
   'Early development tree. Being established before any structural work. Exact Abies species unconfirmed.',
@@ -322,3 +322,7 @@ VALUES
   'Fast-growing deciduous conifer intended for future bonsai development. Will be allowed to grow freely for now.',
   32, 80, 2.5, 7
 );
+
+-- v1 single-zone irrigation hardware is assigned to Silver Fir ("Tipsoo")
+INSERT OR IGNORE INTO irrigation_zones (tree_id, valve_channel, mode)
+VALUES ('silver-fir', 1, 'manual');
