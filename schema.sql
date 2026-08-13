@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS conditions_readings (
   black_globe_temp_c REAL,
   wbgt_c REAL,
   pm25 REAL,
+  battery_sensor_array_code REAL,
+  battery_pm25_ch1_code REAL,
+  battery_bgt_voltage_v REAL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_conditions_readings_ts ON conditions_readings(ts);

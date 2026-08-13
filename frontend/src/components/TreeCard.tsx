@@ -48,7 +48,7 @@ export function TreeCard({ tree }: { tree: Tree }) {
         </div>
 
         <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-soft)' }}>
-          <span className="mono">EC {latest.soilEcAvg}</span>
+          <span className="mono">EC {latest.soilEcAvg} mS/cm</span>
           <span className="mono">{formatTemp(latest.soilTempAvg, system)}{tempUnit(system)}</span>
         </div>
 

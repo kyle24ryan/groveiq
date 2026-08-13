@@ -78,7 +78,7 @@ export function TreeDetail() {
             />
           </Card>
           <Card>
-            <MetricValue label="EC" value={latest.soilEcAvg} delta={ecInRange ? 'In range' : 'Elevated'} deltaTone={ecInRange ? 'ok' : 'watch'} />
+            <MetricValue label="EC" value={latest.soilEcAvg} unit="mS/cm" delta={ecInRange ? 'In range' : 'Elevated'} deltaTone={ecInRange ? 'ok' : 'watch'} />
           </Card>
           <Card>
             <MetricValue label="Soil temp" value={formatTemp(latest.soilTempAvg, system)} unit={tempUnit(system)} />
@@ -104,7 +104,7 @@ export function TreeDetail() {
             <div>
               <div style={{ color: 'var(--ink-soft)' }}>EC ceiling</div>
               <div className="mono" style={{ marginTop: 2 }}>
-                {tree.ecThresholdHigh}
+                {tree.ecThresholdHigh} mS/cm
               </div>
             </div>
             <div>
@@ -177,7 +177,7 @@ export function TreeDetail() {
         <ReadingChart title="Soil moisture — last 30 days" data={readings} dataKey="soilMoistureAvg" color="var(--ok)" unit="%" />
         <ReadingChart title="Soil temperature — last 30 days" data={readingsInDisplayUnits} dataKey="soilTempAvg" color="var(--insight)" unit={tempUnit(system)} />
       </div>
-      <ReadingChart title="Soil EC — last 30 days" data={readings} dataKey="soilEcAvg" color="var(--watch)" />
+      <ReadingChart title="Soil EC — last 30 days" data={readings} dataKey="soilEcAvg" color="var(--watch)" unit=" mS/cm" />
 
       <div>
         <div className="eyebrow" style={{ marginBottom: 10 }}>

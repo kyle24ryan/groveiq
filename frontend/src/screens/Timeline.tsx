@@ -111,7 +111,7 @@ export function Timeline() {
           <MetricValue label="Date" value={reading.date} />
           <MetricValue label="Soil moisture" value={reading.soilMoistureAvg} unit="%" />
           <MetricValue label="Soil temp" value={formatTemp(reading.soilTempAvg, system)} unit={tempUnit(system)} />
-          <MetricValue label="EC" value={reading.soilEcAvg} />
+          <MetricValue label="EC" value={reading.soilEcAvg} unit="mS/cm" />
         </div>
       </Card>
 

@@ -1,14 +1,32 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '../components/Card';
 import { trees } from '../data/mockData';
 import { useUnits, type UnitSystem } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
+import { fetchLatestConditions, freshnessLabel, type ConditionsReading } from '../lib/api';
 
 type ThresholdStrategy = 'groveiq' | 'species' | 'custom';
 
 export function Settings() {
   const [strategy, setStrategy] = useState<ThresholdStrategy>('groveiq');
   const { system, setSystem } = useUnits();
+  const [latest, setLatest] = useState<ConditionsReading | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLatestConditions()
+      .then((reading) => {
+        if (!cancelled) setLatest(reading);
+      })
+      .catch(() => {
+        // Devices & sensors section falls back to "unreachable" below.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const freshness = freshnessLabel(latest?.ts ?? null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 900 }}>
@@ -80,7 +98,21 @@ export function Settings() {
           Devices & sensors
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <DeviceRow name="Weather gateway" status="Live · polling every 5 min" tone="ok" />
+          <DeviceRow name="Weather gateway" status={latest ? freshness.label : 'Unreachable'} tone={latest && !freshness.stale ? 'ok' : undefined} />
+          {latest && (
+            <div style={{ paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <DeviceSubRow
+                name="Sensor array battery"
+                status={latest.battery_sensor_array_code === 0 ? 'Normal' : latest.battery_sensor_array_code != null ? `Low (code ${latest.battery_sensor_array_code})` : 'Unknown'}
+                tone={latest.battery_sensor_array_code === 0 ? 'ok' : latest.battery_sensor_array_code != null ? 'watch' : undefined}
+              />
+              <DeviceSubRow
+                name="PM2.5 sensor battery"
+                status={latest.battery_pm25_ch1_code != null ? `Level ${latest.battery_pm25_ch1_code} (raw code, scale unconfirmed)` : 'Unknown'}
+              />
+              <DeviceSubRow name="Black-globe sensor" status={latest.battery_bgt_voltage_v != null ? `${latest.battery_bgt_voltage_v}V` : 'Unknown'} />
+            </div>
+          )}
           <DeviceRow name="Soil moisture probes (5)" status="Ordered, not yet arrived" />
           <DeviceRow name="Camera" status="Ordered, not yet installed" />
           <DeviceRow name="Irrigation controller" status="Hardware in hand, firmware scaffolded and untested" />
@@ -151,7 +183,7 @@ export function Settings() {
                 <th style={{ padding: '6px 8px', fontWeight: 500 }}>Tree</th>
                 <th style={{ padding: '6px 8px', fontWeight: 500 }}>Moisture low</th>
                 <th style={{ padding: '6px 8px', fontWeight: 500 }}>Moisture high</th>
-                <th style={{ padding: '6px 8px', fontWeight: 500 }}>EC high</th>
+                <th style={{ padding: '6px 8px', fontWeight: 500 }}>EC high (mS/cm)</th>
                 <th style={{ padding: '6px 8px', fontWeight: 500 }}>Dormancy soil temp ({tempUnit(system)})</th>
               </tr>
             </thead>
@@ -197,13 +229,22 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DeviceRow({ name, status, tone }: { name: string; status: string; tone?: 'ok' }) {
+function DeviceRow({ name, status, tone }: { name: string; status: string; tone?: 'ok' | 'watch' }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
       <span>{name}</span>
       <span className={tone ? `status-${tone}` : undefined} style={{ color: tone ? undefined : 'var(--ink-soft)' }}>
         {status}
       </span>
+    </div>
+  );
+}
+
+function DeviceSubRow({ name, status, tone }: { name: string; status: string; tone?: 'ok' | 'watch' }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--ink-faint)' }}>
+      <span>{name}</span>
+      <span className={tone ? `status-${tone}` : undefined}>{status}</span>
     </div>
   );
 }

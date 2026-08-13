@@ -27,6 +27,15 @@ export type EcowittConditions = {
   wbgtC: number | null;
 };
 
+export type EcowittBattery = {
+  // Raw codes, not percentages — Ecowitt doesn't document what range these
+  // fall in, so displaying "4/5" or similar would be a guess. Only the BGT
+  // sensor reports an unambiguous unit (volts).
+  sensorArrayCode: number | null;
+  pm25Ch1Code: number | null;
+  bgtVoltageV: number | null;
+};
+
 export type EcowittSoilChannel = {
   channel: number;
   soilMoisturePct: number | null;
@@ -35,6 +44,7 @@ export type EcowittSoilChannel = {
 export type EcowittReading = {
   fetchedAt: string;
   conditions: EcowittConditions;
+  battery: EcowittBattery;
   soilChannels: EcowittSoilChannel[];
   raw: unknown; // kept for debugging until the shape is confirmed
 };
@@ -94,6 +104,7 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
   const pm25 = (data.pm25_ch1 as Record<string, unknown>) ?? {};
   // WittBoy BGT sensor — confirmed present on this account.
   const blackGlobe = (data.black_globe_temperature as Record<string, unknown>) ?? {};
+  const batteryRaw = (data.battery as Record<string, unknown>) ?? {};
 
   const conditions: EcowittConditions = {
     outdoorTempC: num(extractValue(outdoor.temperature)),
@@ -111,6 +122,12 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
     wbgtC: num(extractValue(blackGlobe.wbgt)),
   };
 
+  const battery: EcowittBattery = {
+    sensorArrayCode: num(extractValue(batteryRaw.sensor_array)),
+    pm25Ch1Code: num(extractValue(batteryRaw.pm25_sensor_ch1)),
+    bgtVoltageV: num(extractValue(batteryRaw.bgt_sensor)),
+  };
+
   const soilChannels: EcowittSoilChannel[] = [];
   for (let ch = 1; ch <= 5; ch++) {
     const node = data[`soil_ch${ch}`] as Record<string, unknown> | undefined;
@@ -124,6 +141,7 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
   return {
     fetchedAt: new Date().toISOString(),
     conditions,
+    battery,
     soilChannels,
     raw: body,
   };
@@ -131,10 +149,12 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
 
 export async function writeConditionsReading(env: Env, reading: EcowittReading): Promise<void> {
   const c = reading.conditions;
+  const b = reading.battery;
   await env.DB.prepare(
     `INSERT INTO conditions_readings
-       (ts, outdoor_temp_c, humidity_pct, wind_mph, wind_dir_deg, rain_in, pressure_hpa, solar_wm2, uvi, black_globe_temp_c, wbgt_c, pm25)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (ts, outdoor_temp_c, humidity_pct, wind_mph, wind_dir_deg, rain_in, pressure_hpa, solar_wm2, uvi,
+        black_globe_temp_c, wbgt_c, pm25, battery_sensor_array_code, battery_pm25_ch1_code, battery_bgt_voltage_v)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       reading.fetchedAt,
@@ -148,7 +168,10 @@ export async function writeConditionsReading(env: Env, reading: EcowittReading):
       c.uvi,
       c.blackGlobeTempC,
       c.wbgtC,
-      c.pm25
+      c.pm25,
+      b.sensorArrayCode,
+      b.pm25Ch1Code,
+      b.bgtVoltageV
     )
     .run();
 }
