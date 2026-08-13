@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
@@ -9,11 +10,47 @@ import { metricInfo } from '../data/metricInfo';
 import { trees, speciesReference, dailyReadingsFor, insightFor, milestonesFor, lastWateredFor } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, formatTemp, tempUnit } from '../lib/units';
+import { fetchTreeAnalyses, uploadTreePhoto, photoUrl, type PhotoAnalysis } from '../lib/api';
 
 export function TreeDetail() {
   const { system } = useUnits();
   const { treeId } = useParams<{ treeId: string }>();
   const tree = trees.find((t) => t.id === treeId);
+
+  const [photoAnalyses, setPhotoAnalyses] = useState<PhotoAnalysis[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!treeId) return;
+    let cancelled = false;
+    fetchTreeAnalyses(treeId)
+      .then((analyses) => {
+        if (!cancelled) setPhotoAnalyses(analyses.filter((a) => a.kind === 'vision'));
+      })
+      .catch(() => {
+        // Imagery section falls back to placeholders below; not worth a
+        // hard error banner for a background fetch.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [treeId]);
+
+  async function handleFileSelected(file: File) {
+    if (!treeId) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const result = await uploadTreePhoto(treeId, file);
+      setPhotoAnalyses((prev) => [result, ...prev]);
+    } catch (err) {
+      setUploadError(String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   if (!tree) {
     return (
@@ -148,14 +185,62 @@ export function TreeDetail() {
       )}
 
       <div>
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          Imagery
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="eyebrow">Imagery</div>
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileSelected(file);
+                e.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              style={{
+                fontSize: 12.5,
+                padding: '5px 12px',
+                borderRadius: 999,
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--ink)',
+                cursor: uploading ? 'default' : 'pointer',
+                opacity: uploading ? 0.6 : 1,
+              }}
+            >
+              {uploading ? 'Analyzing…' : 'Upload photo for analysis'}
+            </button>
+          </div>
         </div>
         <Card>
           <div style={{ display: 'flex', gap: 10, overflowX: 'auto' }}>
-            {Array.from({ length: 4 }).map((_, i) => (
+            {photoAnalyses.map((a) => (
               <div
-                key={i}
+                key={a.id}
+                title={a.summary ?? undefined}
+                style={{
+                  flex: '0 0 auto',
+                  width: 120,
+                  aspectRatio: '4 / 3',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  border: `2px solid var(--${a.status === 'ok' ? 'ok' : a.status === 'watch' ? 'watch' : a.status === 'urgent' ? 'urgent' : 'border'})`,
+                }}
+              >
+                {a.photo_url && (
+                  <img src={photoUrl(a.photo_url)} alt={`${tree.name} — ${a.ts}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                )}
+              </div>
+            ))}
+            {Array.from({ length: Math.max(0, 4 - photoAnalyses.length) }).map((_, i) => (
+              <div
+                key={`placeholder-${i}`}
                 style={{
                   flex: '0 0 auto',
                   width: 120,
@@ -176,8 +261,29 @@ export function TreeDetail() {
               </div>
             ))}
           </div>
+
+          {uploadError && (
+            <p style={{ fontSize: 12, color: 'var(--urgent)', marginTop: 10 }}>Upload failed: {uploadError}</p>
+          )}
+
+          {photoAnalyses[0] && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                {photoAnalyses[0].status && <StatusBadge status={photoAnalyses[0].status} size="sm" />}
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)' }}>
+                  {photoAnalyses[0].ts}
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{photoAnalyses[0].detail}</p>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-            <p style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Weekly automated captures will appear here once the camera is installed.</p>
+            <p style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+              {photoAnalyses.length > 0
+                ? 'Weekly automated captures will also appear here once the camera is installed.'
+                : 'Weekly automated captures will appear here once the camera is installed — or upload a photo now for an on-demand check.'}
+            </p>
             <Link to="/timeline" style={{ fontSize: 12.5, color: 'var(--insight)', flexShrink: 0 }}>
               View in Timeline →
             </Link>

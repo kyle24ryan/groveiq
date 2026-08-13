@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { handleIrrigationRoute } from './routes/irrigation';
 import { handleConditionsRoute } from './routes/conditions';
+import { handlePhotosRoute } from './routes/photos';
 import { fetchEcowittRealTime, writeConditionsReading } from './ecowitt';
 
 export default {
@@ -19,6 +20,11 @@ export default {
 
     if (url.pathname.startsWith('/api/v1/conditions/')) {
       const response = await handleConditionsRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname.startsWith('/api/v1/trees/') || url.pathname.startsWith('/api/v1/photos/')) {
+      const response = await handlePhotosRoute(request, env, url.pathname);
       if (response) return response;
     }
 

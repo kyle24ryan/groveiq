@@ -1,4 +1,5 @@
-const API_BASE = 'https://api.grove-iq.com/api/v1';
+const API_ORIGIN = 'https://api.grove-iq.com';
+const API_BASE = `${API_ORIGIN}/api/v1`;
 
 export type ConditionsReading = {
   id: number;
@@ -33,6 +34,41 @@ export async function fetchConditionsHistory(hours = 24): Promise<ConditionsRead
   if (!res.ok) throw new Error(`conditions/history failed: ${res.status}`);
   const body = (await res.json()) as { readings: ConditionsReading[] };
   return body.readings;
+}
+
+export type PhotoAnalysis = {
+  id: number;
+  kind: string;
+  source: string | null;
+  status: 'ok' | 'watch' | 'urgent' | null;
+  summary: string | null;
+  detail: string | null;
+  model: string | null;
+  photo_r2_key: string | null;
+  photo_url: string | null;
+  ts: string;
+};
+
+export async function fetchTreeAnalyses(treeId: string): Promise<PhotoAnalysis[]> {
+  const res = await fetch(`${API_BASE}/trees/${treeId}/analyses`);
+  if (!res.ok) throw new Error(`analyses fetch failed: ${res.status}`);
+  const body = (await res.json()) as { analyses: PhotoAnalysis[] };
+  return body.analyses;
+}
+
+export async function uploadTreePhoto(treeId: string, file: File): Promise<PhotoAnalysis> {
+  const res = await fetch(`${API_BASE}/trees/${treeId}/photos`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  });
+  const body = (await res.json()) as PhotoAnalysis & { error?: string };
+  if (!res.ok) throw new Error(body.error || `upload failed: ${res.status}`);
+  return body;
+}
+
+export function photoUrl(relativePath: string): string {
+  return `${API_ORIGIN}${relativePath}`;
 }
 
 // Cron polls every 5 minutes; call it stale past 3x that so a couple of

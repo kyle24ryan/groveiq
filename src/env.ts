@@ -5,4 +5,5 @@ export interface Env {
   ECOWITT_APPLICATION_KEY?: string;
   ECOWITT_API_KEY?: string;
   ECOWITT_MAC?: string;
+  ANTHROPIC_API_KEY?: string;
 }
