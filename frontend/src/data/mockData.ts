@@ -1,4 +1,4 @@
-import type { Conditions, DailyReading, Forecast, Insight, Milestone, SpeciesReference, Status, Tree } from './types';
+import type { Conditions, DailyReading, Insight, Milestone, SpeciesReference, Status, Tree } from './types';
 
 // Grove Collection — Kyle Ryan, North Bend, WA. Mirrors migrations/0001_real_trees_and_species.sql.
 export const trees: Tree[] = [
@@ -436,22 +436,4 @@ export function waterDemandNow(vpd: number = vpdKPa()): { label: string; tone: '
   if (vpd > 1.6) return { label: 'High', tone: 'urgent' };
   if (vpd > 0.9) return { label: 'Moderate', tone: 'watch' };
   return { label: 'Low', tone: 'ok' };
-}
-
-export function forecastNext7Days(): Forecast[] {
-  const rand = seededRandom(42);
-  const days: Forecast[] = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() + i);
-    days.push({
-      date: localDateStr(date),
-      lowTempF: Math.round(48 + rand() * 10),
-      highTempF: Math.round(70 + rand() * 12),
-      windGustMph: Math.round(5 + rand() * 20),
-      precipChancePct: Math.round(rand() * 60),
-      frostRisk: false,
-    });
-  }
-  return days;
 }

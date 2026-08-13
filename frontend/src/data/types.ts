@@ -82,15 +82,6 @@ export type Conditions = {
   pm25: number;
 };
 
-export type Forecast = {
-  date: string;
-  lowTempF: number;
-  highTempF: number;
-  windGustMph: number;
-  precipChancePct: number;
-  frostRisk: boolean;
-};
-
 export type Insight = {
   id: string;
   treeId: string | null;

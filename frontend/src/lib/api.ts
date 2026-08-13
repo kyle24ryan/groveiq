@@ -87,6 +87,45 @@ export async function fetchActiveAlerts(): Promise<ActiveAlert[]> {
   return body.alerts;
 }
 
+export type ForecastDay = {
+  date: string;
+  low_temp_f: number | null;
+  high_temp_f: number | null;
+  wind_gust_mph: number | null;
+  precip_chance_pct: number | null;
+  frost_risk: number;
+  fetched_at: string;
+};
+
+export async function fetchForecast(): Promise<ForecastDay[]> {
+  const res = await fetch(`${API_BASE}/forecast`);
+  if (!res.ok) throw new Error(`forecast failed: ${res.status}`);
+  const body = (await res.json()) as { forecasts: ForecastDay[] };
+  return body.forecasts;
+}
+
+export type SunTimes = { sunrise: string; sunset: string; dayLengthHours: number };
+
+export async function fetchSunTimes(): Promise<SunTimes> {
+  const res = await fetch(`${API_BASE}/sun`);
+  if (!res.ok) throw new Error(`sun failed: ${res.status}`);
+  return (await res.json()) as SunTimes;
+}
+
+export type RegionalAqi = {
+  ts: string;
+  airnow_aqi: number | null;
+  airnow_category: string | null;
+  reporting_area: string | null;
+};
+
+export async function fetchRegionalAqi(): Promise<RegionalAqi | null> {
+  const res = await fetch(`${API_BASE}/regional-aqi/latest`);
+  if (!res.ok) throw new Error(`regional-aqi failed: ${res.status}`);
+  const body = (await res.json()) as { observation: RegionalAqi | null };
+  return body.observation;
+}
+
 // Cron polls every 5 minutes; call it stale past 3x that so a couple of
 // missed ticks don't immediately flip the badge.
 const STALE_THRESHOLD_MS = 15 * 60 * 1000;

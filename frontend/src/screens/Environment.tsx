@@ -6,8 +6,19 @@ import { StatusBadge } from '../components/StatusBadge';
 import { InfoTooltip } from '../components/InfoTooltip';
 import { AlertBanner } from '../components/AlertBanner';
 import { metricInfo } from '../data/metricInfo';
-import { trees, vpdKPa, waterDemandNow, forecastNext7Days, insightFor } from '../data/mockData';
-import { fetchLatestConditions, fetchConditionsHistory, freshnessLabel, type ConditionsReading } from '../lib/api';
+import { trees, vpdKPa, waterDemandNow, insightFor } from '../data/mockData';
+import {
+  fetchLatestConditions,
+  fetchConditionsHistory,
+  fetchForecast,
+  fetchSunTimes,
+  fetchRegionalAqi,
+  freshnessLabel,
+  type ConditionsReading,
+  type ForecastDay,
+  type SunTimes,
+  type RegionalAqi,
+} from '../lib/api';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, tempUnit, formatTemp, formatWindSpeed, windSpeedUnit, formatPressure, pressureUnit, formatRain, rainUnit } from '../lib/units';
 import type { Status } from '../data/types';
@@ -44,6 +55,9 @@ export function Environment() {
   const { system } = useUnits();
   const [latest, setLatest] = useState<ConditionsReading | null>(null);
   const [history, setHistory] = useState<ConditionsReading[]>([]);
+  const [forecast, setForecast] = useState<ForecastDay[]>([]);
+  const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
+  const [regionalAqi, setRegionalAqi] = useState<RegionalAqi | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,12 +75,25 @@ export function Environment() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
+    // Forecast/sun/regional-AQI are independent of the live conditions feed
+    // and shouldn't block or be blocked by it — fetched separately, each
+    // failing silently since none of them are the primary content here.
+    fetchForecast()
+      .then((f) => !cancelled && setForecast(f))
+      .catch(() => {});
+    fetchSunTimes()
+      .then((s) => !cancelled && setSunTimes(s))
+      .catch(() => {});
+    fetchRegionalAqi()
+      .then((r) => !cancelled && setRegionalAqi(r))
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const forecast = forecastNext7Days();
   const rainNext48h = forecast.slice(0, 2);
   const priorityInsight = [...trees.map((t) => insightFor(t.id))].sort((a, b) => {
     const rank = { urgent: 0, watch: 1, ok: 2 } as const;
@@ -169,6 +196,11 @@ export function Environment() {
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 {aqi ? aqi.label : '—'} · PM2.5 {loading ? '—' : fmt(latest?.pm25 ?? null, 0)} µg/m³
               </div>
+              {regionalAqi?.airnow_aqi != null && (
+                <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-faint)' }}>
+                  Regional (AirNow, {regionalAqi.reporting_area}): AQI {regionalAqi.airnow_aqi.toFixed(0)} {regionalAqi.airnow_category}
+                </div>
+              )}
             </Card>
 
             <Card>
@@ -248,16 +280,81 @@ export function Environment() {
             <Card>
               <div className="eyebrow" style={{ marginBottom: 6 }}>
                 Rain outlook
-                <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--insight)', textTransform: 'none' }}>Forecast (demo)</span>
+                <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--ink-faint)', textTransform: 'none' }}>NWS forecast</span>
               </div>
               <div style={{ fontSize: 22, fontWeight: 600 }}>
                 {latest?.rain_in === 0 || latest?.rain_in == null ? 'None observed today' : `${formatRain(latest.rain_in, system)}${rainUnit(system)} today`}
               </div>
               <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 6 }}>
-                Next 48h: {rainNext48h.map((d) => `${d.precipChancePct}%`).join(' / ')} chance of precipitation.
+                {rainNext48h.length > 0
+                  ? `Next 48h: ${rainNext48h.map((d) => `${d.precip_chance_pct ?? 0}%`).join(' / ')} chance of precipitation.`
+                  : 'Forecast unavailable.'}
               </p>
             </Card>
           </div>
+
+          <Card>
+            <div className="eyebrow" style={{ marginBottom: 12 }}>
+              7-day forecast
+              <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--ink-faint)', textTransform: 'none' }}>NWS, North Bend WA</span>
+            </div>
+            {forecast.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Forecast unavailable.</p>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+                {forecast.map((d) => (
+                  <div
+                    key={d.date}
+                    style={{
+                      flex: '0 0 auto',
+                      minWidth: 90,
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: `1px solid ${d.frost_risk ? 'var(--watch)' : 'var(--border)'}`,
+                      background: d.frost_risk ? 'var(--watch-bg)' : 'transparent',
+                    }}
+                  >
+                    <div className="mono" style={{ fontSize: 11, color: 'var(--ink-soft)' }}>
+                      {new Date(`${d.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' })}
+                    </div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>
+                      {d.high_temp_f != null ? formatTemp(((d.high_temp_f - 32) * 5) / 9, system) : '—'}° / {d.low_temp_f != null ? formatTemp(((d.low_temp_f - 32) * 5) / 9, system) : '—'}°
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>{d.precip_chance_pct ?? 0}% rain</div>
+                    {d.frost_risk === 1 && <div style={{ fontSize: 11, color: 'var(--watch)', marginTop: 2 }}>Frost risk</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {sunTimes && (
+            <Card>
+              <div className="eyebrow" style={{ marginBottom: 8 }}>
+                Sun
+              </div>
+              <div style={{ display: 'flex', gap: 24, fontSize: 13 }}>
+                <div>
+                  <div style={{ color: 'var(--ink-soft)', fontSize: 12 }}>Sunrise</div>
+                  <div className="mono" style={{ fontSize: 16, marginTop: 2 }}>
+                    {sunTimes.sunrise}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--ink-soft)', fontSize: 12 }}>Sunset</div>
+                  <div className="mono" style={{ fontSize: 16, marginTop: 2 }}>
+                    {sunTimes.sunset}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--ink-soft)', fontSize: 12 }}>Day length</div>
+                  <div className="mono" style={{ fontSize: 16, marginTop: 2 }}>
+                    {sunTimes.dayLengthHours}h
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
 
           <Card style={{ borderColor: 'var(--insight)' }}>
             <div className="eyebrow" style={{ marginBottom: 6, color: 'var(--insight)' }}>
