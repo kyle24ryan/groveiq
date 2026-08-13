@@ -14,3 +14,6 @@ database_id = "2a25f083-531a-4b55-9b75-5daaa277d12a"
 [[r2_buckets]]
 binding = "PHOTOS"
 bucket_name = "groveiq-photos"
+
+[triggers]
+crons = ["*/5 * * * *"]

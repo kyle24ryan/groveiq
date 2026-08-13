@@ -1,6 +1,6 @@
 import type { Env } from './env';
 import { handleIrrigationRoute } from './routes/irrigation';
-import { fetchEcowittRealTime } from './ecowitt';
+import { fetchEcowittRealTime, writeConditionsReading } from './ecowitt';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -30,5 +30,14 @@ export default {
     return new Response('GroveIQ API — Phase 0 skeleton', {
       headers: { 'content-type': 'text/plain' },
     });
+  },
+
+  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+    const reading = await fetchEcowittRealTime(env);
+    if (!reading) return; // credentials not configured
+    await writeConditionsReading(env, reading);
+    // Soil channels intentionally unwritten — WH52 sensors haven't arrived
+    // yet, so reading.soilChannels is always empty right now. Wire up
+    // soil_readings writes once they're mapped to real trees.
   },
 };

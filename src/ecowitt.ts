@@ -1,12 +1,11 @@
 // Ecowitt Cloud API integration.
 //
-// ASSUMED SHAPE — written against Ecowitt's documented Cloud API v3
-// real_time endpoint, never verified against a real payload from this
-// account's gateway/firmware. Field names are known to vary by firmware
-// version (SPEC.md flags this explicitly). Treat every field access below
-// as a hypothesis to confirm, not a known-good mapping — see
-// verifyEcowittPayload() below, which is meant to be run once real
-// credentials are available and then deleted/adjusted based on what it finds.
+// VERIFIED against a real payload from this account's GW3000 + WS69 + WH41 +
+// WittBoy BGT on 2026-08-12 (see git history for the raw response). Field
+// names below are confirmed, not guessed — but note Ecowitt's own docs say
+// shape can still vary by firmware/hardware combo, so if a future account
+// or sensor swap breaks this, re-verify against /api/debug/ecowitt rather
+// than assuming.
 
 import type { Env } from './env';
 
@@ -23,6 +22,8 @@ export type EcowittConditions = {
   solarWm2: number | null;
   uvi: number | null;
   pm25: number | null;
+  blackGlobeTempC: number | null;
+  wbgtC: number | null;
 };
 
 export type EcowittSoilChannel = {
@@ -62,11 +63,14 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
   url.searchParams.set('application_key', env.ECOWITT_APPLICATION_KEY);
   url.searchParams.set('api_key', env.ECOWITT_API_KEY);
   url.searchParams.set('mac', env.ECOWITT_MAC);
-  url.searchParams.set('call_back', 'outdoor,wind,rainfall,pressure,solar_and_uvi,pm25_aqi,soil_ch1,soil_ch2,soil_ch3,soil_ch4,soil_ch5');
+  // call_back=all rather than a hand-maintained group whitelist — the
+  // whitelist approach silently drops data when a group name is wrong
+  // (pm25_aqi vs. the real pm25_ch1, discovered during verification).
+  url.searchParams.set('call_back', 'all');
   url.searchParams.set('temp_unitid', '1'); // Celsius
   url.searchParams.set('wind_speed_unitid', '9'); // mph
   url.searchParams.set('pressure_unitid', '3'); // hPa
-  url.searchParams.set('rainfall_unitid', '12'); // inches
+  url.searchParams.set('rainfall_unitid', '13'); // inches (12 is mm, verified)
 
   const response = await fetch(url.toString());
   if (!response.ok) {
@@ -84,7 +88,11 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
   const rainfall = (data.rainfall as Record<string, unknown>) ?? {};
   const pressure = (data.pressure as Record<string, unknown>) ?? {};
   const solar = (data.solar_and_uvi as Record<string, unknown>) ?? {};
-  const pm25 = (data.pm25_aqi as Record<string, unknown>) ?? {};
+  // Verified key is pm25_ch1 (per-channel), not the pm25_aqi group name
+  // originally assumed.
+  const pm25 = (data.pm25_ch1 as Record<string, unknown>) ?? {};
+  // WittBoy BGT sensor — confirmed present on this account.
+  const blackGlobe = (data.black_globe_temperature as Record<string, unknown>) ?? {};
 
   const conditions: EcowittConditions = {
     outdoorTempC: num(extractValue(outdoor.temperature)),
@@ -97,9 +105,8 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
     solarWm2: num(extractValue(solar.solar)),
     uvi: num(extractValue(solar.uvi)),
     pm25: num(extractValue(pm25.pm25)),
-    // No known Ecowitt field for black-globe/heat-stress temperature (SPEC.md
-    // 1.1 lists it as a monitored metric, but it's not a standard Ecowitt
-    // sensor). Leaving unmapped until we confirm what hardware produces it.
+    blackGlobeTempC: num(extractValue(blackGlobe.bgt)),
+    wbgtC: num(extractValue(blackGlobe.wbgt)),
   };
 
   const soilChannels: EcowittSoilChannel[] = [];
@@ -126,6 +133,6 @@ export async function writeConditionsReading(env: Env, reading: EcowittReading):
     `INSERT INTO conditions_readings (ts, outdoor_temp_c, humidity_pct, wind_mph, rain_in, black_globe_temp_c, pm25)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   )
-    .bind(reading.fetchedAt, c.outdoorTempC, c.humidityPct, c.windMph, c.rainDailyIn, null, c.pm25)
+    .bind(reading.fetchedAt, c.outdoorTempC, c.humidityPct, c.windMph, c.rainDailyIn, c.blackGlobeTempC, c.pm25)
     .run();
 }
