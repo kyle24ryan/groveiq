@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS conditions_readings (
   black_globe_temp_c REAL,
   wbgt_c REAL,
   pm25 REAL,
+  pm25_aqi REAL,
+  pm25_aqi_24h REAL,
   battery_sensor_array_code REAL,
   battery_pm25_ch1_code REAL,
   battery_bgt_voltage_v REAL,

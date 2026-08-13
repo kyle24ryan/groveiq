@@ -18,6 +18,6 @@ export const metricInfo = {
   moistureRange: "This tree's preferred soil moisture band, based on its species and development stage.",
   ecCeiling: 'EC level above which salt/fertilizer buildup is considered elevated for this tree.',
   lastWatered: 'Time since this tree was last watered, manually or by the irrigation system.',
-  aqi: "PM2.5 translated into GroveIQ's watch/attention bands (US EPA-style thresholds).",
+  aqi: 'US EPA Air Quality Index, computed from PM2.5 by the weather station itself — 0-50 Good, 51-100 Moderate, 101+ progressively worse for sensitive groups and beyond.',
   heatStress: "WBGT translated into GroveIQ's watch/attention bands — a rough guide, not a calibrated medical/agronomic threshold.",
 } as const;

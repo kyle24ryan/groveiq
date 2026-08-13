@@ -23,6 +23,8 @@ export type EcowittConditions = {
   solarWm2: number | null;
   uvi: number | null;
   pm25: number | null;
+  pm25Aqi: number | null;
+  pm25Aqi24h: number | null;
   blackGlobeTempC: number | null;
   wbgtC: number | null;
 };
@@ -118,6 +120,8 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
     solarWm2: num(extractValue(solar.solar)),
     uvi: num(extractValue(solar.uvi)),
     pm25: num(extractValue(pm25.pm25)),
+    pm25Aqi: num(extractValue(pm25.real_time_aqi)),
+    pm25Aqi24h: num(extractValue(pm25['24_hours_aqi'])),
     blackGlobeTempC: num(extractValue(blackGlobe.bgt)),
     wbgtC: num(extractValue(blackGlobe.wbgt)),
   };
@@ -153,8 +157,9 @@ export async function writeConditionsReading(env: Env, reading: EcowittReading):
   await env.DB.prepare(
     `INSERT INTO conditions_readings
        (ts, outdoor_temp_c, humidity_pct, wind_mph, wind_dir_deg, rain_in, pressure_hpa, solar_wm2, uvi,
-        black_globe_temp_c, wbgt_c, pm25, battery_sensor_array_code, battery_pm25_ch1_code, battery_bgt_voltage_v)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        black_globe_temp_c, wbgt_c, pm25, pm25_aqi, pm25_aqi_24h,
+        battery_sensor_array_code, battery_pm25_ch1_code, battery_bgt_voltage_v)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       reading.fetchedAt,
@@ -169,6 +174,8 @@ export async function writeConditionsReading(env: Env, reading: EcowittReading):
       c.blackGlobeTempC,
       c.wbgtC,
       c.pm25,
+      c.pm25Aqi,
+      c.pm25Aqi24h,
       b.sensorArrayCode,
       b.pm25Ch1Code,
       b.bgtVoltageV

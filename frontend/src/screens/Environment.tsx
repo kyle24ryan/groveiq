@@ -16,11 +16,14 @@ function compassLabel(deg: number): string {
   return compassPoints[Math.round(deg / 22.5) % 16];
 }
 
-// PM2.5 (µg/m³) EPA-style bands, simplified to our ok/watch/urgent language.
-function aqiStatus(pm25: number): Status {
-  if (pm25 > 35) return 'urgent';
-  if (pm25 > 12) return 'watch';
-  return 'ok';
+// Standard US EPA AQI categories, mapped to our ok/watch/urgent language.
+function aqiCategory(aqi: number): { label: string; status: Status } {
+  if (aqi <= 50) return { label: 'Good', status: 'ok' };
+  if (aqi <= 100) return { label: 'Moderate', status: 'watch' };
+  if (aqi <= 150) return { label: 'Unhealthy for sensitive groups', status: 'watch' };
+  if (aqi <= 200) return { label: 'Unhealthy', status: 'urgent' };
+  if (aqi <= 300) return { label: 'Very unhealthy', status: 'urgent' };
+  return { label: 'Hazardous', status: 'urgent' };
 }
 
 // Rough WBGT flag-system bands (Celsius), simplified to ok/watch/urgent —
@@ -72,7 +75,7 @@ export function Environment() {
 
   const vpd = latest?.outdoor_temp_c != null && latest?.humidity_pct != null ? vpdKPa(latest.outdoor_temp_c, latest.humidity_pct) : null;
   const demand = vpd !== null ? waterDemandNow(vpd) : null;
-  const aqi = latest?.pm25 != null ? aqiStatus(latest.pm25) : null;
+  const aqi = latest?.pm25_aqi != null ? aqiCategory(latest.pm25_aqi) : null;
   const heatStress = latest?.wbgt_c != null ? heatStressStatus(latest.wbgt_c) : null;
   const freshness = freshnessLabel(latest?.ts ?? null);
 
@@ -157,9 +160,12 @@ export function Environment() {
                   Air quality
                   <InfoTooltip text={metricInfo.aqi} />
                 </div>
-                {aqi && <StatusBadge status={aqi} size="sm" />}
+                {aqi && <StatusBadge status={aqi.status} size="sm" />}
               </div>
-              <MetricValue label="PM2.5" value={loading ? '—' : fmt(latest?.pm25 ?? null, 0)} unit="µg/m³" tooltip={metricInfo.pm25} />
+              <MetricValue label="AQI" value={loading ? '—' : fmt(latest?.pm25_aqi ?? null, 0)} tooltip={metricInfo.aqi} />
+              <div style={{ marginTop: 10, fontSize: 13 }}>
+                {aqi ? aqi.label : '—'} · PM2.5 {loading ? '—' : fmt(latest?.pm25 ?? null, 0)} µg/m³
+              </div>
             </Card>
 
             <Card>

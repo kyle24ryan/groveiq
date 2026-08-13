@@ -25,6 +25,8 @@ type ConditionsRow = {
   black_globe_temp_c: number | null;
   wbgt_c: number | null;
   pm25: number | null;
+  pm25_aqi: number | null;
+  pm25_aqi_24h: number | null;
   battery_sensor_array_code: number | null;
   battery_pm25_ch1_code: number | null;
   battery_bgt_voltage_v: number | null;
