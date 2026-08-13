@@ -141,6 +141,21 @@ CREATE TABLE IF NOT EXISTS forecast_alerts_config (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Current-condition alerts (edge-triggered), evaluated from the live
+-- Ecowitt feed each poll. Not the NWS-forecast-based frost/wind alerts
+-- SPEC.md 1.5 describes -- see migrations/0006 for the distinction.
+CREATE TABLE IF NOT EXISTS alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_type TEXT NOT NULL,          -- 'wind' | 'heat' | 'aqi'
+  tier TEXT NOT NULL CHECK (tier IN ('watch','urgent')),
+  message TEXT NOT NULL,
+  reading_value REAL,
+  triggered_at TEXT NOT NULL DEFAULT (datetime('now')),
+  resolved_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_active ON alerts(alert_type, resolved_at);
+
 -- ============================================================
 -- JOURNAL (1.11)
 -- ============================================================

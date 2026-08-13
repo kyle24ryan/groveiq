@@ -4,6 +4,7 @@ import { Card } from '../components/Card';
 import { MetricValue } from '../components/MetricValue';
 import { StatusBadge } from '../components/StatusBadge';
 import { InfoTooltip } from '../components/InfoTooltip';
+import { AlertBanner } from '../components/AlertBanner';
 import { metricInfo } from '../data/metricInfo';
 import { trees, vpdKPa, waterDemandNow, forecastNext7Days, insightFor } from '../data/mockData';
 import { fetchLatestConditions, fetchConditionsHistory, freshnessLabel, type ConditionsReading } from '../lib/api';
@@ -100,6 +101,8 @@ export function Environment() {
           {!loading && !error && <InfoTooltip text={metricInfo.dataFreshness} />}
         </p>
       </div>
+
+      <AlertBanner />
 
       {error && (
         <Card style={{ borderColor: 'var(--urgent)' }}>

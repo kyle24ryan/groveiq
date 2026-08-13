@@ -71,6 +71,22 @@ export function photoUrl(relativePath: string): string {
   return `${API_ORIGIN}${relativePath}`;
 }
 
+export type ActiveAlert = {
+  id: number;
+  alert_type: 'wind' | 'heat' | 'aqi' | string;
+  tier: 'watch' | 'urgent';
+  message: string;
+  reading_value: number | null;
+  triggered_at: string;
+};
+
+export async function fetchActiveAlerts(): Promise<ActiveAlert[]> {
+  const res = await fetch(`${API_BASE}/alerts/active`);
+  if (!res.ok) throw new Error(`alerts/active failed: ${res.status}`);
+  const body = (await res.json()) as { alerts: ActiveAlert[] };
+  return body.alerts;
+}
+
 // Cron polls every 5 minutes; call it stale past 3x that so a couple of
 // missed ticks don't immediately flip the badge.
 const STALE_THRESHOLD_MS = 15 * 60 * 1000;

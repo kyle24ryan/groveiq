@@ -7,6 +7,7 @@ import { fetchLatestConditions, freshnessLabel, type ConditionsReading } from '.
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit, formatRain, rainUnit } from '../lib/units';
 import { InfoTooltip } from '../components/InfoTooltip';
+import { AlertBanner } from '../components/AlertBanner';
 import { metricInfo } from '../data/metricInfo';
 import type { Status } from '../data/types';
 
@@ -104,6 +105,8 @@ export function Grove() {
           {freshness.label}
         </span>
       </div>
+
+      <AlertBanner />
 
       {priorityInsight.status !== 'ok' && <InsightPanel insight={priorityInsight} treeName={priorityTree?.name} />}
 
