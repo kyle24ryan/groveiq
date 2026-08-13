@@ -1,10 +1,16 @@
-const API_ORIGIN = 'https://api.grove-iq.com';
+// Same-origin in production (grove-iq.com/api/* is routed to the Worker --
+// see wrangler.toml) so the browser never sends a cross-origin CORS
+// preflight to api.grove-iq.com. That preflight is unauthenticated by the
+// fetch spec (browsers never attach credentials to it), and Cloudflare
+// Access blocks anonymous requests with a bare 403 and no CORS headers --
+// which broke every POST/PUT call once Access went in front of
+// api.grove-iq.com. Same-origin requests never preflight, sidestepping the
+// conflict entirely. Local dev has no same-origin Worker, so it falls back
+// to the live cross-origin API (fine for the GET-only screens tested from
+// localhost; POST/PUT flows need testing against the deployed site).
+const API_ORIGIN = typeof window !== 'undefined' && window.location.hostname === 'grove-iq.com' ? '' : 'https://api.grove-iq.com';
 const API_BASE = `${API_ORIGIN}/api/v1`;
 
-// credentials: 'include' on every call so the browser sends the Cloudflare
-// Access session cookie cross-origin (grove-iq.com -> api.grove-iq.com).
-// Without this, requests would silently drop the cookie and get redirected
-// to the Access login page instead of returning JSON.
 function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   return fetch(input, { ...init, credentials: 'include' });
 }

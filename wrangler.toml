@@ -6,6 +6,17 @@ compatibility_date = "2026-08-11"
 pattern = "api.grove-iq.com"
 custom_domain = true
 
+# Same-origin path for the SPA to call, so the browser never has to send a
+# cross-origin CORS preflight to api.grove-iq.com — Cloudflare Access
+# blocks anonymous preflight OPTIONS requests (browsers never attach
+# credentials to a preflight, by the fetch spec), which broke every POST/PUT
+# call once Access went in front of api.grove-iq.com. Same-origin requests
+# never preflight, sidestepping the conflict entirely rather than fighting
+# it. api.grove-iq.com stays live too, for direct/service-token testing.
+[[routes]]
+pattern = "grove-iq.com/api/*"
+zone_name = "grove-iq.com"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "groveiq-db"
