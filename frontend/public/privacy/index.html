@@ -5,18 +5,85 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Privacy Policy — GroveIQ</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; color: #18181B; line-height: 1.6; background: #FAFAF8; }
-  h1 { font-size: 28px; margin-bottom: 4px; }
-  h2 { font-size: 19px; margin-top: 40px; border-bottom: 1px solid #E5E7EB; padding-bottom: 8px; }
-  .meta { color: #6B7280; font-size: 14px; margin-bottom: 32px; }
-  a { color: #5B5BD6; }
-  .callout { background: #EEEEFB; border: 1px solid #C7C7F5; border-radius: 8px; padding: 16px; margin: 16px 0; font-size: 14px; }
-  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #E5E7EB; font-size: 13px; color: #6B7280; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --canvas: #FAFAF8;
+    --surface: #FFFFFF;
+    --ink: #18181B;
+    --ink-soft: #6B7280;
+    --ink-faint: #9CA3AF;
+    --border: #E5E7EB;
+    --insight: #5B5BD6;
+    --insight-bg: #EEEEFB;
+    --brand: #2F6D4F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --canvas: #121214;
+      --surface: #1A1A1D;
+      --ink: #F4F4F5;
+      --ink-soft: #A1A1AA;
+      --ink-faint: #71717A;
+      --border: #27272A;
+      --insight: #A5A6F6;
+      --insight-bg: rgba(165, 166, 246, 0.12);
+      --brand: #4ADE80;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 20px 80px;
+    color: var(--ink);
+    background: var(--canvas);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 28px 0 8px;
+  }
+  header .mark {
+    font-weight: 700;
+    font-size: 16px;
+  }
+  h1 { font-size: 26px; font-weight: 700; margin: 20px 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; font-weight: 600; margin-top: 36px; letter-spacing: -0.005em; }
+  h3 { font-size: 14px; font-weight: 600; margin-top: 24px; color: var(--ink); }
+  p, li { font-size: 14.5px; color: var(--ink); }
+  .meta { color: var(--ink-soft); font-size: 13px; margin-bottom: 28px; }
+  a { color: var(--insight); text-decoration: underline; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 16px 0;
+  }
+  footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--ink-soft);
+    display: flex;
+    gap: 16px;
+  }
 </style>
 </head>
 <body>
 
-<h1>GroveIQ Privacy Policy</h1>
+<header>
+  <span class="mark">GroveIQ</span>
+</header>
+
+<h1>Privacy Policy</h1>
 <p class="meta">Effective date: August 13, 2026 &middot; Last updated: August 13, 2026</p>
 
 <p>GroveIQ ("GroveIQ," "we," "us") is a personal environmental-monitoring and plant-care project operated by Kyle Ryan. This policy explains what information we collect for our SMS/MMS text notification program, how we use it, and the choices available to you. It also briefly covers the other data GroveIQ collects to operate its dashboard.</p>
@@ -30,14 +97,16 @@
 <p>We use this information only to deliver the operational SMS/MMS alerts you've requested, and to record and honor your consent and opt-out choices as required by law and by our messaging provider's policies.</p>
 
 <h3>Message categories</h3>
-<ul>
-  <li>Plant health alerts</li>
-  <li>Sensor alerts</li>
-  <li>Irrigation alerts</li>
-  <li>Environment &amp; weather alerts</li>
-  <li>Security alerts</li>
-  <li>Account &amp; service notices</li>
-</ul>
+<div class="card">
+  <ul style="margin: 0; padding-left: 20px;">
+    <li>Plant health alerts</li>
+    <li>Sensor alerts</li>
+    <li>Irrigation alerts</li>
+    <li>Environment &amp; weather alerts</li>
+    <li>Security alerts</li>
+    <li>Account &amp; service notices</li>
+  </ul>
+</div>
 <p>GroveIQ does not currently send marketing text messages. If that ever changes, it will require a separate, explicit opt-in — never inferred from your operational-alert consent.</p>
 
 <h3>Message frequency</h3>
@@ -50,8 +119,8 @@
 <p>Reply <strong>STOP</strong> to any GroveIQ text message at any time to opt out of all GroveIQ text messages. Reply <strong>HELP</strong> for assistance, or contact us at <a href="mailto:kyle.24.ryan@gmail.com">kyle.24.ryan@gmail.com</a>.</p>
 
 <h3>How we share (and don't share) this information</h3>
-<div class="callout">
-Mobile information, including phone numbers and SMS opt-in data and consent, will not be shared, sold, rented, or disclosed to third parties or affiliates for their marketing or promotional purposes. This excludes service providers that process data solely on GroveIQ's behalf to deliver the messaging service (such as our SMS/MMS delivery provider, Twilio), and disclosures required by law. SMS opt-in data and consent will not be transferred to any third party for purposes unrelated to providing the services you requested.
+<div class="card" style="border-color: var(--insight); background: var(--insight-bg);">
+  <p style="margin: 0;">Mobile information, including phone numbers and SMS opt-in data and consent, will not be shared, sold, rented, or disclosed to third parties or affiliates for their marketing or promotional purposes. This excludes service providers that process data solely on GroveIQ's behalf to deliver the messaging service (such as our SMS/MMS delivery provider, Twilio), and disclosures required by law. SMS opt-in data and consent will not be transferred to any third party for purposes unrelated to providing the services you requested.</p>
 </div>
 
 <h3>How long we keep this information</h3>
@@ -73,7 +142,8 @@ Mobile information, including phone numbers and SMS opt-in data and consent, wil
 <p>We may update this policy from time to time. The "Last updated" date above reflects the most recent revision.</p>
 
 <footer>
-  <a href="/terms">Terms &amp; Conditions</a> &middot; <a href="/">GroveIQ</a>
+  <a href="/terms">Terms &amp; Conditions</a>
+  <a href="/">GroveIQ</a>
 </footer>
 
 </body>

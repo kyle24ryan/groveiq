@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { InfoTooltip } from '../components/InfoTooltip';
 import { AlertBanner } from '../components/AlertBanner';
 import { RegionalMaps } from '../components/RegionalMaps';
+import { Collapsible } from '../components/Collapsible';
 import { metricInfo } from '../data/metricInfo';
 import { trees, vpdKPa, waterDemandNow, insightFor } from '../data/mockData';
 import {
@@ -200,7 +201,11 @@ export function Environment() {
               {regionalAqi?.airnow_aqi != null && (
                 <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-faint)' }}>
                   Regional (AirNow, {regionalAqi.reporting_area}): AQI {regionalAqi.airnow_aqi.toFixed(0)} {regionalAqi.airnow_category}
-                  {regionalAqi.discussion && <p style={{ marginTop: 4, lineHeight: 1.4 }}>{regionalAqi.discussion}</p>}
+                  {regionalAqi.discussion && (
+                    <Collapsible trigger="Forecast discussion">
+                      <p style={{ lineHeight: 1.4 }}>{regionalAqi.discussion}</p>
+                    </Collapsible>
+                  )}
                 </div>
               )}
             </Card>
