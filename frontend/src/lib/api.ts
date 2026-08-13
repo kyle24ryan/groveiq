@@ -146,3 +146,76 @@ export function freshnessLabel(ts: string | null): { label: string; stale: boole
   const label = minutes < 1 ? 'Live · just now' : minutes < 60 ? `Live · ${minutes}m ago` : `Stale · ${Math.round(minutes / 60)}h ago`;
   return { label: stale ? label.replace('Live', 'Stale') : label, stale };
 }
+
+// --- SMS/MMS notification consent (spec: GROVEIQ_TWILIO_SMS_REQUIREMENTS.md) ---
+// Note: these routes are /api/me/... and /api/v1/sms/..., not under
+// API_BASE's /api/v1 prefix uniformly -- matching the doc's section 11
+// URL convention exactly, not this file's existing API_BASE pattern.
+
+export type ConsentTextResponse = {
+  text: string;
+  version: string;
+  categories: Record<string, { label: string; example: string }>;
+};
+
+export async function fetchConsentText(): Promise<ConsentTextResponse> {
+  const res = await apiFetch(`${API_ORIGIN}/api/v1/sms/consent-text`);
+  if (!res.ok) throw new Error(`consent-text failed: ${res.status}`);
+  return (await res.json()) as ConsentTextResponse;
+}
+
+export type NotificationPreferences = {
+  phone: string | null;
+  phoneVerified: boolean;
+  operationalConsent: 'pending' | 'active' | 'opted_out' | 'suppressed' | 'revoked';
+  categories: Record<string, boolean>;
+  consentTextVersion: string;
+  privacyVersion: string;
+  termsVersion: string;
+};
+
+export async function fetchNotificationPreferences(): Promise<NotificationPreferences> {
+  const res = await apiFetch(`${API_ORIGIN}/api/me/notification-preferences`);
+  if (!res.ok) throw new Error(`notification-preferences failed: ${res.status}`);
+  return (await res.json()) as NotificationPreferences;
+}
+
+export async function startPhoneVerification(phone: string, operationalConsent: boolean): Promise<{ ok: boolean; error?: string }> {
+  const res = await apiFetch(`${API_ORIGIN}/api/me/phone/verification/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, operationalConsent }),
+  });
+  const body = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok) return { ok: false, error: body.error };
+  return { ok: true };
+}
+
+export async function confirmPhoneVerification(phone: string, code: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await apiFetch(`${API_ORIGIN}/api/me/phone/verification/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, code }),
+  });
+  const body = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok) return { ok: false, error: body.error };
+  return { ok: true };
+}
+
+export async function setNotificationCategories(categories: Record<string, boolean>): Promise<{ ok: boolean; error?: string }> {
+  const res = await apiFetch(`${API_ORIGIN}/api/me/notification-preferences/sms`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ categories }),
+  });
+  const body = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok) return { ok: false, error: body.error };
+  return { ok: true };
+}
+
+export async function withdrawSmsConsent(): Promise<{ ok: boolean; error?: string }> {
+  const res = await apiFetch(`${API_ORIGIN}/api/me/sms/withdraw`, { method: 'POST' });
+  const body = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok) return { ok: false, error: body.error };
+  return { ok: true };
+}

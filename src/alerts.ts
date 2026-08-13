@@ -8,12 +8,33 @@
 import type { Env } from './env';
 import type { EcowittConditions } from './ecowitt';
 import type { DailyForecast } from './nws';
+import { sendAlertEmail } from './email';
+import { sendOperationalSms } from './sms/sendService';
+import { getPrimaryPhoneContact } from './sms/consent';
 
 type AlertType = 'wind' | 'heat' | 'aqi' | 'frost' | 'wind_gust_forecast';
 type Source = 'current' | 'forecast';
 type Tier = 'watch' | 'urgent';
 
 type EvalResult = { tier: Tier | null; value: number | null };
+
+// Tiered delivery per SPEC.md 1.5: watch -> email, urgent -> email + SMS,
+// silent on recovery. Only fires on a genuinely new alert (edge-triggered,
+// same as the alerts table itself) -- never on every poll.
+async function deliverAlert(env: Env, tier: Tier, message: string): Promise<void> {
+  await sendAlertEmail(env, `GroveIQ ${tier} alert`, message);
+
+  if (tier !== 'urgent') return;
+
+  const contact = await getPrimaryPhoneContact(env);
+  if (!contact) return; // no phone on file yet -- authorizeOperationalSend would reject anyway, skip the query
+  await sendOperationalSms(env, {
+    phoneContactId: contact.id,
+    category: 'environment_weather',
+    body: `GroveIQ weather alert: ${message} Reply STOP to opt out.`,
+    templateVersion: 'weather-alert-v1',
+  });
+}
 
 async function upsertAlert(env: Env, type: AlertType, source: Source, result: EvalResult, message: string): Promise<void> {
   const active = await env.DB.prepare(`SELECT id, tier FROM alerts WHERE alert_type = ? AND resolved_at IS NULL ORDER BY triggered_at DESC LIMIT 1`)
@@ -39,6 +60,8 @@ async function upsertAlert(env: Env, type: AlertType, source: Source, result: Ev
   await env.DB.prepare(`INSERT INTO alerts (alert_type, source, tier, message, reading_value) VALUES (?, ?, ?, ?, ?)`)
     .bind(type, source, result.tier, message, result.value)
     .run();
+
+  await deliverAlert(env, result.tier, message);
 }
 
 // ---- Current-condition (5-min poll) ----

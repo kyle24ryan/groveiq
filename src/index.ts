@@ -4,6 +4,8 @@ import { handleConditionsRoute } from './routes/conditions';
 import { handlePhotosRoute } from './routes/photos';
 import { handleAlertsRoute } from './routes/alerts';
 import { handleForecastRoute } from './routes/forecast';
+import { handleNotificationsRoute } from './routes/notifications';
+import { handleTwilioWebhook } from './routes/twilioWebhook';
 import { fetchEcowittRealTime, writeConditionsReading } from './ecowitt';
 import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
 import { fetchNwsForecast, writeForecasts } from './nws';
@@ -41,6 +43,15 @@ export default {
     if (url.pathname === '/api/v1/forecast' || url.pathname === '/api/v1/sun' || url.pathname === '/api/v1/regional-aqi/latest') {
       const response = await handleForecastRoute(request, env, url.pathname);
       if (response) return response;
+    }
+
+    {
+      const response = await handleNotificationsRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname === '/api/webhooks/twilio/messaging' && request.method === 'POST') {
+      return handleTwilioWebhook(request, env);
     }
 
     // TODO: temporary, for verifying the real Ecowitt payload shape (SPEC.md

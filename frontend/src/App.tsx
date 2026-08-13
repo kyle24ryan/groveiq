@@ -8,6 +8,7 @@ import { Environment } from './screens/Environment';
 import { Timeline } from './screens/Timeline';
 import { Insights } from './screens/Insights';
 import { Settings } from './screens/Settings';
+import { NotificationSettings } from './screens/NotificationSettings';
 import { SpeciesReference } from './screens/SpeciesReference';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
             <Route path="timeline" element={<Timeline />} />
             <Route path="insights" element={<Insights />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="settings/notifications" element={<NotificationSettings />} />
           </Route>
         </Routes>
       </BrowserRouter>

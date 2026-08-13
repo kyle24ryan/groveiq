@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { trees } from '../data/mockData';
 import { useUnits, type UnitSystem } from '../contexts/UnitsContext';
@@ -134,9 +135,14 @@ export function Settings() {
           Notifications
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13.5 }}>
-          <NotificationRow tier="Watch alerts" tone="watch" channels={{ email: true, push: true, sms: false }} />
-          <NotificationRow tier="Attention alerts" tone="urgent" channels={{ email: true, push: true, sms: true }} />
-          <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>Not wired up yet — coming in a later phase.</p>
+          <NotificationRow tier="Watch alerts" tone="watch" channels={{ email: true, push: false, sms: false }} />
+          <NotificationRow tier="Attention alerts" tone="urgent" channels={{ email: true, push: false, sms: true }} />
+          <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+            Email is live. SMS is built and consent-gated — delivery is pending Twilio's A2P 10DLC campaign approval.
+          </p>
+          <Link to="/settings/notifications" style={{ fontSize: 13, color: 'var(--insight)', marginTop: 4 }}>
+            Manage text message alerts →
+          </Link>
         </div>
       </Card>
 

@@ -7,4 +7,14 @@ export interface Env {
   ECOWITT_MAC?: string;
   ANTHROPIC_API_KEY?: string;
   AIRNOW_API_KEY?: string;
+  RESEND_API_KEY?: string;
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_API_KEY_SID?: string;
+  TWILIO_API_KEY_SECRET?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_FROM_NUMBER?: string;
+  ALERT_EMAIL_TO?: string;
+  ALERT_SMS_TO?: string;
+  PHONE_ENCRYPTION_KEY?: string;
+  PHONE_HASH_KEY?: string;
 }

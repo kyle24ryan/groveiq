@@ -15,7 +15,7 @@ export function corsHeaders(request: Request): HeadersInit {
     // POST is real: photos.ts's upload endpoint sends Content-Type:
     // image/jpeg, which isn't a CORS "simple request" and triggers a
     // preflight OPTIONS this needs to pass.
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-Device-Key',
     Vary: 'Origin',
   };
