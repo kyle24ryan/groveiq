@@ -4,7 +4,7 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-13 (NWS/AirNow/sun-calc landed).
+Last updated: 2026-08-13 (Cloudflare Access live on both domains).
 
 ## Phase 0 — no hardware needed
 
@@ -111,11 +111,12 @@ still blocked on Phase 1 hardware.
 - [x] Device health (battery/freshness) surfaced in Settings from live data
 - [x] Hover tooltips explaining every displayed metric
 - [x] Live vs. demo data clearly labeled throughout the UI
-- [ ] **No auth anywhere** — `grove-iq.com` is fully public, and
-      `POST /api/v1/trees/:id/photos` (real Anthropic spend) and
-      `POST /api/v1/irrigation/water` (real-world valve trigger) are
-      publicly writable with zero auth. Decided on Cloudflare Access
-      (edge-level login, zero app code) as the fix — next up.
+- [x] Cloudflare Access gating both `grove-iq.com` and `api.grove-iq.com` —
+      GitHub SSO (email-restricted policy), zero app code beyond CORS
+      credential support (`credentials: 'include'` on all frontend fetch
+      calls, `Access-Control-Allow-Credentials` on the Worker). A Cloudflare
+      Access service token (`.cf-access-service-token`, gitignored) lets
+      Claude Code's own testing bypass the interactive login.
 
 ## Open decisions carried from SPEC.md section 7 (still open)
 

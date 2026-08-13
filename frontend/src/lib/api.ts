@@ -1,6 +1,14 @@
 const API_ORIGIN = 'https://api.grove-iq.com';
 const API_BASE = `${API_ORIGIN}/api/v1`;
 
+// credentials: 'include' on every call so the browser sends the Cloudflare
+// Access session cookie cross-origin (grove-iq.com -> api.grove-iq.com).
+// Without this, requests would silently drop the cookie and get redirected
+// to the Access login page instead of returning JSON.
+function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  return fetch(input, { ...init, credentials: 'include' });
+}
+
 export type ConditionsReading = {
   id: number;
   ts: string;
@@ -23,14 +31,14 @@ export type ConditionsReading = {
 };
 
 export async function fetchLatestConditions(): Promise<ConditionsReading | null> {
-  const res = await fetch(`${API_BASE}/conditions/latest`);
+  const res = await apiFetch(`${API_BASE}/conditions/latest`);
   if (!res.ok) throw new Error(`conditions/latest failed: ${res.status}`);
   const body = (await res.json()) as { reading: ConditionsReading | null };
   return body.reading;
 }
 
 export async function fetchConditionsHistory(hours = 24): Promise<ConditionsReading[]> {
-  const res = await fetch(`${API_BASE}/conditions/history?hours=${hours}`);
+  const res = await apiFetch(`${API_BASE}/conditions/history?hours=${hours}`);
   if (!res.ok) throw new Error(`conditions/history failed: ${res.status}`);
   const body = (await res.json()) as { readings: ConditionsReading[] };
   return body.readings;
@@ -50,14 +58,14 @@ export type PhotoAnalysis = {
 };
 
 export async function fetchTreeAnalyses(treeId: string): Promise<PhotoAnalysis[]> {
-  const res = await fetch(`${API_BASE}/trees/${treeId}/analyses`);
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/analyses`);
   if (!res.ok) throw new Error(`analyses fetch failed: ${res.status}`);
   const body = (await res.json()) as { analyses: PhotoAnalysis[] };
   return body.analyses;
 }
 
 export async function uploadTreePhoto(treeId: string, file: File): Promise<PhotoAnalysis> {
-  const res = await fetch(`${API_BASE}/trees/${treeId}/photos`, {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/photos`, {
     method: 'POST',
     headers: { 'Content-Type': file.type },
     body: file,
@@ -81,7 +89,7 @@ export type ActiveAlert = {
 };
 
 export async function fetchActiveAlerts(): Promise<ActiveAlert[]> {
-  const res = await fetch(`${API_BASE}/alerts/active`);
+  const res = await apiFetch(`${API_BASE}/alerts/active`);
   if (!res.ok) throw new Error(`alerts/active failed: ${res.status}`);
   const body = (await res.json()) as { alerts: ActiveAlert[] };
   return body.alerts;
@@ -98,7 +106,7 @@ export type ForecastDay = {
 };
 
 export async function fetchForecast(): Promise<ForecastDay[]> {
-  const res = await fetch(`${API_BASE}/forecast`);
+  const res = await apiFetch(`${API_BASE}/forecast`);
   if (!res.ok) throw new Error(`forecast failed: ${res.status}`);
   const body = (await res.json()) as { forecasts: ForecastDay[] };
   return body.forecasts;
@@ -107,7 +115,7 @@ export async function fetchForecast(): Promise<ForecastDay[]> {
 export type SunTimes = { sunrise: string; sunset: string; dayLengthHours: number };
 
 export async function fetchSunTimes(): Promise<SunTimes> {
-  const res = await fetch(`${API_BASE}/sun`);
+  const res = await apiFetch(`${API_BASE}/sun`);
   if (!res.ok) throw new Error(`sun failed: ${res.status}`);
   return (await res.json()) as SunTimes;
 }
@@ -120,7 +128,7 @@ export type RegionalAqi = {
 };
 
 export async function fetchRegionalAqi(): Promise<RegionalAqi | null> {
-  const res = await fetch(`${API_BASE}/regional-aqi/latest`);
+  const res = await apiFetch(`${API_BASE}/regional-aqi/latest`);
   if (!res.ok) throw new Error(`regional-aqi failed: ${res.status}`);
   const body = (await res.json()) as { observation: RegionalAqi | null };
   return body.observation;

@@ -7,3 +7,4 @@ dist/
 .claude/scheduled_tasks.lock
 firmware/**/include/secrets.h
 firmware/**/.pio/
+.cf-access-service-token

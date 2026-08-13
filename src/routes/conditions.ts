@@ -7,7 +7,16 @@ export function corsHeaders(request: Request): HeadersInit {
   const allowOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://grove-iq.com';
   return {
     'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    // Credentials required so the browser sends the Cloudflare Access
+    // session cookie on cross-origin fetch() calls from grove-iq.com to
+    // api.grove-iq.com — can't use a wildcard origin together with this,
+    // which is why ALLOWED_ORIGINS is an explicit allowlist above.
+    'Access-Control-Allow-Credentials': 'true',
+    // POST is real: photos.ts's upload endpoint sends Content-Type:
+    // image/jpeg, which isn't a CORS "simple request" and triggers a
+    // preflight OPTIONS this needs to pass.
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Device-Key',
     Vary: 'Origin',
   };
 }
