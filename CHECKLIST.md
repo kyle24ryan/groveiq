@@ -6,6 +6,25 @@ and `SPEC.md` are authoritative when they disagree with this file.
 
 Last updated: 2026-08-13 (SMS verification flow confirmed working end-to-end; pending A2P 10DLC approval to actually deliver).
 
+## UI/UX backlog (user feedback 2026-08-13, not yet started)
+
+1. Push notifications — new delivery channel, no service worker/subscription
+   flow exists yet
+2. Environment (and most screens) still reads as "journal-feeling" despite
+   the earlier Linear/Vercel-style redesign — needs another design pass
+3. Grove (home) feels elementary, especially the top metrics/status strip
+4. Trend graphs wherever data exists, collapsible via a graph-icon toggle
+   per card — pattern to match: Ecowitt's own dashboard (icon top-right of
+   each card expands/collapses an inline chart)
+5. Nothing tree-specific is editable via the UI (thresholds, notes, origin,
+   etc.) — same for profile/account info. Everything currently requires a
+   code change + redeploy to update.
+6. `/privacy` and `/terms` look like plain unstyled text, not matching the
+   rest of the app's design system — tension to resolve: they're
+   deliberately static/JS-free (Twilio campaign reviewers, no Access login)
+   but that doesn't mean they can't carry real inline CSS matching the
+   app's palette/type
+
 ## Phase 0 — no hardware needed
 
 - [x] Finalize D1 schema incl. new tables (trees, soil_readings,
