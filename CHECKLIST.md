@@ -4,7 +4,7 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-13 (Phase 2 started).
+Last updated: 2026-08-13 (NWS/AirNow/sun-calc landed).
 
 ## Phase 0 — no hardware needed
 
@@ -51,10 +51,15 @@ until the probes show up.
       /api/v1/trees/:id/photos` stores to R2, calls Claude Sonnet with the
       photo + species context, writes into `analyses`. Verified end-to-end
       with a real upload through the UI (TreeDetail's Imagery section).
-- [x] Current-condition weather alerts (wind/heat/AQI, edge-triggered) —
-      **not** the NWS-forecast-based frost/wind-gust alerts SPEC.md 1.5
-      describes; see the open decision below. In-app banner only, no
-      email/SMS delivery.
+- [x] Current-condition weather alerts (wind/heat/AQI, edge-triggered) plus
+      forecast-based alerts (frost tonight, wind gusts — SPEC.md 1.5's exact
+      examples), from a real NWS integration (`src/nws.ts`). In-app banner
+      only, no email/SMS delivery.
+- [x] Local sunrise/sunset/day-length calc (`src/suncalc.ts`), no API/key
+      needed — supports Dawn Redwood's day-length dormancy trigger (1.4, 1a)
+- [x] AirNow regional AQI (`src/airnow.ts`) — built and wired, but not yet
+      activated: `AIRNOW_API_KEY` isn't configured, so it no-ops gracefully.
+      Get a free key at docs.airnowapi.org to turn it on.
 - [ ] Daily per-tree diagnostic vs. species thresholds — deliberately not
       built yet. Buildable today, but without real soil data it would only
       ever diagnose fake per-tree readings against real (shared) weather —
@@ -83,12 +88,6 @@ still blocked on Phase 1 hardware.
       hardware — not done, needs the ESP32 physically wired up
 - [ ] Comparative insights, dormancy mode — not started (depends on
       Phase 2's AI layer and real soil-sensor history)
-- [ ] Forecast-based alerts (frost tonight, wind gusts >25mph per spec's
-      exact examples) — not started; no NWS or AirNow integration exists
-      (`forecasts` and `forecast_alerts_config` tables exist in schema but
-      are unused). Current-condition alerts (wind/heat/AQI right now, not
-      forecasted) exist as of Phase 2 — see above; this is the remaining,
-      more faithful-to-spec half.
 - [ ] Milestones, journal entries, training log — schema exists, no UI to
       create/edit any of these (Timeline only *displays* milestones already
       seeded in mock data)
@@ -112,12 +111,17 @@ still blocked on Phase 1 hardware.
 - [x] Device health (battery/freshness) surfaced in Settings from live data
 - [x] Hover tooltips explaining every displayed metric
 - [x] Live vs. demo data clearly labeled throughout the UI
+- [ ] **No auth anywhere** — `grove-iq.com` is fully public, and
+      `POST /api/v1/trees/:id/photos` (real Anthropic spend) and
+      `POST /api/v1/irrigation/water` (real-world valve trigger) are
+      publicly writable with zero auth. Decided on Cloudflare Access
+      (edge-level login, zero app code) as the fix — next up.
 
 ## Open decisions carried from SPEC.md section 7 (still open)
 
-- NWS forecast lat/long for the grove not yet confirmed/wired
-- AirNow API key not signed up for (currently relying on Ecowitt's own
-  PM2.5/AQI instead — reasonable substitute, but not what spec described)
+- ~~NWS forecast lat/long~~ resolved — 47.49,-121.7871 confirmed to resolve
+  to North Bend WA specifically (gridId SEW), not a generic Seattle station
+- AirNow API key not signed up for — code is ready, just needs the key
 - Dormancy thresholds are rough per-species guesses, not researched
 - Self-tuning threshold auto-apply vs. always-ask: undecided (leaning
   always-ask per spec's own recommendation)
@@ -126,10 +130,6 @@ still blocked on Phase 1 hardware.
 - Reolink mounting/preset count for covering all 5 trees: undecided
 - Irrigation GHT↔FPT fitting compatibility: unconfirmed (needs hardware)
 - Irrigation rotary switch requires soldering: unconfirmed comfort level
-- Alerts currently cover current-condition wind/heat/AQI, not spec 1.5's
-  forecast-based frost/wind-gust examples — worth deciding whether NWS
-  integration is worth doing for the forecast half, or if current-condition
-  coverage is good enough for personal-scale use
 
 ## Module #2 / #3 (Smart Rotation, AI Camera Station)
 
