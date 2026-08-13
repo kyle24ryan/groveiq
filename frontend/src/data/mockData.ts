@@ -340,13 +340,20 @@ export function milestonesFor(treeId: string): Milestone[] {
   return milestones.sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
+// Values match a real reading pulled from the live Ecowitt station (WS69 +
+// WH41 + WittBoy BGT) on 2026-08-12, since the mapping is now verified.
 export const currentConditions: Conditions = {
-  outdoorTempC: 22,
-  humidityPct: 58,
-  windMph: 6,
+  outdoorTempC: 22.3,
+  outdoorTempHighC: 23.9,
+  outdoorTempLowC: 15.2,
+  humidityPct: 64,
+  windMph: 1.1,
+  windDirDeg: 227,
   rainIn: 0,
-  blackGlobeTempC: 27,
-  pm25: 8,
+  pressureHpa: 989.8,
+  blackGlobeTempC: 22.3,
+  wbgtC: 19,
+  pm25: 19,
 };
 
 // Tetens formula: saturation vapor pressure (kPa) from temp (C); VPD = es * (1 - RH/100).

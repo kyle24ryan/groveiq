@@ -70,10 +70,15 @@ export type Milestone = {
 
 export type Conditions = {
   outdoorTempC: number;
+  outdoorTempHighC: number;
+  outdoorTempLowC: number;
   humidityPct: number;
   windMph: number;
+  windDirDeg: number;
   rainIn: number;
+  pressureHpa: number;
   blackGlobeTempC: number;
+  wbgtC: number;
   pm25: number;
 };
 

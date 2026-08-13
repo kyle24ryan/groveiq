@@ -1,7 +1,30 @@
 import { Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart } from 'recharts';
 import { Card } from '../components/Card';
 import { MetricValue } from '../components/MetricValue';
+import { StatusBadge } from '../components/StatusBadge';
 import { trees, currentConditions, vpdKPa, hourlyConditionsToday, waterDemandNow, forecastNext7Days, insightFor } from '../data/mockData';
+import type { Status } from '../data/types';
+
+const compassPoints = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+function compassLabel(deg: number): string {
+  return compassPoints[Math.round(deg / 22.5) % 16];
+}
+
+// PM2.5 (µg/m³) EPA-style bands, simplified to our ok/watch/urgent language.
+function aqiStatus(pm25: number): Status {
+  if (pm25 > 35) return 'urgent';
+  if (pm25 > 12) return 'watch';
+  return 'ok';
+}
+
+// Rough WBGT flag-system bands (Celsius), simplified to ok/watch/urgent —
+// not a substitute for a calibrated heat-stress guideline, just enough to
+// flag "this is worth noticing."
+function heatStressStatus(wbgtC: number): Status {
+  if (wbgtC > 30) return 'urgent';
+  if (wbgtC > 27) return 'watch';
+  return 'ok';
+}
 
 export function Environment() {
   const hourly = hourlyConditionsToday();
@@ -14,6 +37,8 @@ export function Environment() {
     return rank[a.status] - rank[b.status];
   })[0];
   const priorityTree = trees.find((t) => t.id === priorityInsight.treeId);
+  const aqi = aqiStatus(currentConditions.pm25);
+  const heatStress = heatStressStatus(currentConditions.wbgtC);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1000 }}>
@@ -24,24 +49,63 @@ export function Environment() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
         <Card>
-          <MetricValue label="Outdoor temp" value={currentConditions.outdoorTempC} unit="°C" />
+          <div className="eyebrow" style={{ marginBottom: 8 }}>
+            Outdoor
+          </div>
+          <MetricValue label="Temperature" value={currentConditions.outdoorTempC} unit="°C" />
+          <div className="mono" style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 8 }}>
+            ↑ {currentConditions.outdoorTempHighC}° &nbsp; ↓ {currentConditions.outdoorTempLowC}°
+          </div>
+          <div style={{ marginTop: 10, fontSize: 13 }}>
+            {currentConditions.humidityPct}% humidity · VPD {vpd} kPa
+          </div>
         </Card>
+
         <Card>
-          <MetricValue label="Humidity" value={currentConditions.humidityPct} unit="%" />
+          <div className="eyebrow" style={{ marginBottom: 8 }}>
+            Wind
+          </div>
+          <MetricValue label="Speed" value={currentConditions.windMph} unit="mph" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 13 }}>
+            <span
+              style={{
+                display: 'inline-block',
+                transform: `rotate(${currentConditions.windDirDeg}deg)`,
+                fontSize: 14,
+              }}
+              aria-hidden="true"
+            >
+              ↑
+            </span>
+            {compassLabel(currentConditions.windDirDeg)} ({currentConditions.windDirDeg}°)
+          </div>
         </Card>
+
         <Card>
-          <MetricValue label="VPD" value={vpd} unit="kPa" />
+          <div className="eyebrow" style={{ marginBottom: 8 }}>
+            Pressure & rain
+          </div>
+          <MetricValue label="Pressure" value={currentConditions.pressureHpa} unit="hPa" />
+          <div style={{ marginTop: 10, fontSize: 13 }}>{currentConditions.rainIn === 0 ? 'No rain today' : `${currentConditions.rainIn}in today`}</div>
         </Card>
+
         <Card>
-          <MetricValue label="Wind" value={currentConditions.windMph} unit="mph" />
-        </Card>
-        <Card>
-          <MetricValue label="Rain today" value={currentConditions.rainIn} unit="in" />
-        </Card>
-        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+            <div className="eyebrow">Air quality</div>
+            <StatusBadge status={aqi} size="sm" />
+          </div>
           <MetricValue label="PM2.5" value={currentConditions.pm25} unit="µg/m³" />
+        </Card>
+
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+            <div className="eyebrow">Heat stress</div>
+            <StatusBadge status={heatStress} size="sm" />
+          </div>
+          <MetricValue label="Black globe" value={currentConditions.blackGlobeTempC} unit="°C" />
+          <div style={{ marginTop: 10, fontSize: 13 }}>WBGT {currentConditions.wbgtC}°C</div>
         </Card>
       </div>
 
