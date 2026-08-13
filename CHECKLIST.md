@@ -4,7 +4,7 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-13 (Cloudflare Access live on both domains).
+Last updated: 2026-08-13 (SMS compliance system built, pending A2P 10DLC approval + Access bypass).
 
 ## Phase 0 — no hardware needed
 
@@ -69,8 +69,15 @@ until the probes show up.
       capture into the vision pipeline — camera ordered, not installed; the
       vision pipeline itself is built and camera-agnostic, so this is a
       hardware-install task once the camera's mounted, not new code.
-- [ ] Email/SMS alert delivery (Resend/Twilio) — alert *detection* exists,
-      delivery doesn't; no accounts/keys set up
+- [x] Email alert delivery (Resend) — live, watch+urgent tiers
+- [⚠️] SMS alert delivery (Twilio) — full technical build done: encrypted
+      phone storage, OTP verification, per-category consent, STOP/HELP/START
+      webhook, centralized consent-gated send service (see
+      `docs/sms-compliance-traceability.md`). **Not yet delivering** — first
+      live test hit Twilio error 30034 (unregistered A2P 10DLC number);
+      user has submitted Brand+Campaign registration, awaiting approval.
+      Also blocked on a Cloudflare Access bypass for `/privacy`, `/terms`,
+      and the Twilio webhook path (dashboard config, verification pending).
 
 **Phase 2 has started** — manual photo vision analysis and current-condition
 alerts are live. Daily per-tree diagnostics and scheduled camera capture are
