@@ -16,4 +16,8 @@ binding = "PHOTOS"
 bucket_name = "groveiq-photos"
 
 [triggers]
-crons = ["*/5 * * * *"]
+# Every 5 min: Ecowitt poll + current-condition alerts.
+# Daily at 13:00 UTC (~6am Pacific): NWS forecast + forecast-based alerts +
+# AirNow, matching SPEC.md 1.5's "checked once daily" cadence for
+# forward-looking data.
+crons = ["*/5 * * * *", "0 13 * * *"]

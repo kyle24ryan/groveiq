@@ -146,15 +146,29 @@ CREATE TABLE IF NOT EXISTS forecast_alerts_config (
 -- SPEC.md 1.5 describes -- see migrations/0006 for the distinction.
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  alert_type TEXT NOT NULL,          -- 'wind' | 'heat' | 'aqi'
+  alert_type TEXT NOT NULL,          -- 'wind' | 'heat' | 'aqi' | 'frost' | 'wind_gust_forecast'
+  source TEXT NOT NULL DEFAULT 'current', -- 'current' (5-min Ecowitt poll) | 'forecast' (daily NWS pull)
   tier TEXT NOT NULL CHECK (tier IN ('watch','urgent')),
   message TEXT NOT NULL,
-  reading_value REAL,
+  reading_value REAL,                -- canonical units: Celsius for temp, mph for wind, unitless for AQI
   triggered_at TEXT NOT NULL DEFAULT (datetime('now')),
   resolved_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_active ON alerts(alert_type, resolved_at);
+
+-- AirNow regional AQI (key-gated, no-ops without AIRNOW_API_KEY configured).
+-- Corroborates the local Ecowitt PM2.5 sensor with a regional reading,
+-- most useful during PNW wildfire smoke season per SPEC.md 1a.
+CREATE TABLE IF NOT EXISTS regional_air_quality (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL DEFAULT (datetime('now')),
+  airnow_aqi REAL,
+  airnow_category TEXT,
+  reporting_area TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_regional_air_quality_ts ON regional_air_quality(ts);
 
 -- ============================================================
 -- JOURNAL (1.11)

@@ -3,8 +3,11 @@ import { handleIrrigationRoute } from './routes/irrigation';
 import { handleConditionsRoute } from './routes/conditions';
 import { handlePhotosRoute } from './routes/photos';
 import { handleAlertsRoute } from './routes/alerts';
+import { handleForecastRoute } from './routes/forecast';
 import { fetchEcowittRealTime, writeConditionsReading } from './ecowitt';
-import { evaluateConditionAlerts } from './alerts';
+import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
+import { fetchNwsForecast, writeForecasts } from './nws';
+import { fetchAirNow, writeAirNowObservation } from './airnow';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -32,6 +35,11 @@ export default {
 
     if (url.pathname.startsWith('/api/v1/alerts/')) {
       const response = await handleAlertsRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname === '/api/v1/forecast' || url.pathname === '/api/v1/sun' || url.pathname === '/api/v1/regional-aqi/latest') {
+      const response = await handleForecastRoute(request, env, url.pathname);
       if (response) return response;
     }
 
@@ -73,12 +81,25 @@ export default {
       return Response.json({ alerts: results });
     }
 
+    // TODO: temporary, for testing the daily NWS/AirNow job on-demand
+    // instead of waiting for the 13:00 UTC cron.
+    if (url.pathname === '/api/debug/daily-job') {
+      const result = await runDailyJob(env);
+      return Response.json(result);
+    }
+
     return new Response('GroveIQ API — Phase 0 skeleton', {
       headers: { 'content-type': 'text/plain' },
     });
   },
 
-  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+  async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
+    if (event.cron === '0 13 * * *') {
+      await runDailyJob(env);
+      return;
+    }
+
+    // Default: the */5 * * * * Ecowitt poll.
     const reading = await fetchEcowittRealTime(env);
     if (!reading) return; // credentials not configured
     await writeConditionsReading(env, reading);
@@ -88,3 +109,30 @@ export default {
     // soil_readings writes once they're mapped to real trees.
   },
 };
+
+async function runDailyJob(env: Env): Promise<{ forecastDays: number; airnow: boolean; errors: string[] }> {
+  const errors: string[] = [];
+  let forecastDays = 0;
+  let airnow = false;
+
+  try {
+    const days = await fetchNwsForecast();
+    await writeForecasts(env, days);
+    await evaluateForecastAlerts(env, days);
+    forecastDays = days.length;
+  } catch (err) {
+    errors.push(`NWS: ${String(err)}`);
+  }
+
+  try {
+    const obs = await fetchAirNow(env);
+    if (obs) {
+      await writeAirNowObservation(env, obs);
+      airnow = true;
+    }
+  } catch (err) {
+    errors.push(`AirNow: ${String(err)}`);
+  }
+
+  return { forecastDays, airnow, errors };
+}
