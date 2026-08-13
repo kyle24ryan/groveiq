@@ -31,7 +31,7 @@ export function Settings() {
           Units & locale
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13.5 }}>
-          <Field label="Temperature" value="Celsius (sensors) / Fahrenheit (forecast)" />
+          <Field label="Temperature" value="Celsius (no unit toggle yet)" />
           <Field label="Timezone" value="America/Los_Angeles" />
         </div>
       </Card>
@@ -41,11 +41,21 @@ export function Settings() {
           Devices & sensors
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <DeviceRow name="Weather gateway" status="Not yet connected" />
+          <DeviceRow name="Weather gateway" status="Live · polling every 5 min" tone="ok" />
           <DeviceRow name="Soil moisture probes (5)" status="Ordered, not yet arrived" />
           <DeviceRow name="Camera" status="Ordered, not yet installed" />
-          <DeviceRow name="Irrigation controller" status="Hardware in hand, firmware not yet built" />
+          <DeviceRow name="Irrigation controller" status="Hardware in hand, firmware scaffolded and untested" />
         </div>
+      </Card>
+
+      <Card style={{ borderColor: 'var(--watch)' }}>
+        <div className="eyebrow" style={{ marginBottom: 6, color: 'var(--watch)' }}>
+          Data mode
+        </div>
+        <p style={{ fontSize: 13.5 }}>
+          This app is currently showing demo data (deterministic mock readings), not the live feed. The weather gateway above
+          really is live and polling into the database — the frontend just isn't wired to read from it yet.
+        </p>
       </Card>
 
       <Card>
@@ -148,11 +158,13 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DeviceRow({ name, status }: { name: string; status: string }) {
+function DeviceRow({ name, status, tone }: { name: string; status: string; tone?: 'ok' }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
       <span>{name}</span>
-      <span style={{ color: 'var(--ink-soft)' }}>{status}</span>
+      <span className={tone ? `status-${tone}` : undefined} style={{ color: tone ? undefined : 'var(--ink-soft)' }}>
+        {status}
+      </span>
     </div>
   );
 }

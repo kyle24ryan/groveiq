@@ -38,8 +38,8 @@ export function Grove() {
           {needsAttention === 0
             ? 'Your grove is stable. Nothing needs attention right now.'
             : `Your grove is stable. ${needsAttention} tree${needsAttention !== 1 ? 's' : ''} need${needsAttention === 1 ? 's' : ''} attention.`}
-          <span className="mono" style={{ color: 'var(--ink-faint)', marginLeft: 8, fontSize: 12 }}>
-            Updated just now
+          <span className="mono" style={{ color: 'var(--watch)', marginLeft: 8, fontSize: 12 }}>
+            Demo data
           </span>
         </p>
       </div>
