@@ -1,5 +1,25 @@
 import type { Env } from './env';
 
+// GUARDRAIL — read before adding a daily/per-tree diagnostic function here:
+//
+// Do NOT send per-tree soil_readings (moisture/EC/temp) to the Anthropic
+// API, or write their output into `analyses` as if it were a real
+// diagnosis, until WH52 soil sensors are physically installed and
+// soil_readings actually contains live data for that tree. Every tree's
+// soil_readings is currently demo/mock data generated client-side
+// (frontend/src/data/mockData.ts) - it never reaches this Worker at all.
+// A "daily diagnostic" built against it would be Claude confidently
+// diagnosing a fake tree from fake numbers, indistinguishable in the UI
+// from a real diagnosis. That's the exact trust failure the Ecowitt UI
+// audit (2026-08) flagged and this codebase spent real effort fixing.
+//
+// analyzeTreePhoto() below is fine as-is: it sends a real uploaded photo,
+// not synthetic sensor readings, and the vision model itself can (and does)
+// recognize when an image isn't a real tree rather than hallucinating a
+// diagnosis. Sensor-based diagnostics don't have that same self-check.
+//
+// See CHECKLIST.md "Phase 2" for current status.
+
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const VISION_MODEL = 'claude-sonnet-5';
 

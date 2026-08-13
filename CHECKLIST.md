@@ -39,6 +39,12 @@ until the probes show up.
 
 ## Phase 2 — AI layer (core daily-use loop)
 
+> **Hard rule, not just a status note:** never send per-tree soil_readings
+> (moisture/EC/temp) to the Anthropic API, or write output into `analyses`
+> as if it were a real diagnosis, until WH52 sensors are physically
+> installed and soil_readings holds live data. See the guardrail comment at
+> the top of `src/claude.ts` before adding any diagnostic function there.
+
 - [x] Anthropic API key configured as a Worker secret — first real AI
       integration exists now (`src/claude.ts`)
 - [x] Photo upload (manual) + vision analysis — `POST
