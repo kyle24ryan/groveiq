@@ -49,8 +49,13 @@ CREATE TABLE IF NOT EXISTS conditions_readings (
   outdoor_temp_c REAL,
   humidity_pct REAL,
   wind_mph REAL,
+  wind_dir_deg REAL,
   rain_in REAL,
+  pressure_hpa REAL,
+  solar_wm2 REAL,
+  uvi REAL,
   black_globe_temp_c REAL,
+  wbgt_c REAL,
   pm25 REAL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

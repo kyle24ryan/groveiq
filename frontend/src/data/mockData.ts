@@ -432,8 +432,7 @@ export function hourlyConditionsToday(): HourlyPoint[] {
   return points;
 }
 
-export function waterDemandNow(): { label: string; tone: 'ok' | 'watch' | 'urgent' } {
-  const vpd = vpdKPa();
+export function waterDemandNow(vpd: number = vpdKPa()): { label: string; tone: 'ok' | 'watch' | 'urgent' } {
   if (vpd > 1.6) return { label: 'High', tone: 'urgent' };
   if (vpd > 0.9) return { label: 'Moderate', tone: 'watch' };
   return { label: 'Low', tone: 'ok' };

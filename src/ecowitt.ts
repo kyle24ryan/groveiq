@@ -16,6 +16,7 @@ export type EcowittConditions = {
   humidityPct: number | null;
   windMph: number | null;
   windGustMph: number | null;
+  windDirDeg: number | null;
   rainRateIn: number | null;
   rainDailyIn: number | null;
   pressureHpa: number | null;
@@ -99,6 +100,7 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
     humidityPct: num(extractValue(outdoor.humidity)),
     windMph: num(extractValue(wind.wind_speed)),
     windGustMph: num(extractValue(wind.wind_gust)),
+    windDirDeg: num(extractValue(wind.wind_direction)),
     rainRateIn: num(extractValue(rainfall.rain_rate)),
     rainDailyIn: num(extractValue(rainfall.daily)),
     pressureHpa: num(extractValue(pressure.relative)),
@@ -130,9 +132,23 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
 export async function writeConditionsReading(env: Env, reading: EcowittReading): Promise<void> {
   const c = reading.conditions;
   await env.DB.prepare(
-    `INSERT INTO conditions_readings (ts, outdoor_temp_c, humidity_pct, wind_mph, rain_in, black_globe_temp_c, pm25)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO conditions_readings
+       (ts, outdoor_temp_c, humidity_pct, wind_mph, wind_dir_deg, rain_in, pressure_hpa, solar_wm2, uvi, black_globe_temp_c, wbgt_c, pm25)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
-    .bind(reading.fetchedAt, c.outdoorTempC, c.humidityPct, c.windMph, c.rainDailyIn, c.blackGlobeTempC, c.pm25)
+    .bind(
+      reading.fetchedAt,
+      c.outdoorTempC,
+      c.humidityPct,
+      c.windMph,
+      c.windDirDeg,
+      c.rainDailyIn,
+      c.pressureHpa,
+      c.solarWm2,
+      c.uvi,
+      c.blackGlobeTempC,
+      c.wbgtC,
+      c.pm25
+    )
     .run();
 }
