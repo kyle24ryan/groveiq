@@ -7,6 +7,7 @@ import { InfoTooltip } from '../components/InfoTooltip';
 import { AlertBanner } from '../components/AlertBanner';
 import { RegionalMaps } from '../components/RegionalMaps';
 import { Collapsible } from '../components/Collapsible';
+import { MiniTrendChart, ChartToggle, useChartToggle } from '../components/MiniTrendChart';
 import { metricInfo } from '../data/metricInfo';
 import { trees, vpdKPa, waterDemandNow, insightFor } from '../data/mockData';
 import {
@@ -22,7 +23,7 @@ import {
   type RegionalAqi,
 } from '../lib/api';
 import { useUnits } from '../contexts/UnitsContext';
-import { convertTemp, tempUnit, formatTemp, formatWindSpeed, windSpeedUnit, formatPressure, pressureUnit, formatRain, rainUnit } from '../lib/units';
+import { convertTemp, tempUnit, formatTemp, convertWindSpeed, formatWindSpeed, windSpeedUnit, convertPressure, formatPressure, pressureUnit, formatRain, rainUnit } from '../lib/units';
 import type { Status } from '../data/types';
 
 const compassPoints = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -113,7 +114,17 @@ export function Environment() {
     hour: new Date(r.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
     temp: r.outdoor_temp_c != null ? convertTemp(r.outdoor_temp_c, system) : null,
     humidityPct: r.humidity_pct,
+    windSpeed: r.wind_mph != null ? convertWindSpeed(r.wind_mph, system) : null,
+    pressure: r.pressure_hpa != null ? convertPressure(r.pressure_hpa, system) : null,
+    aqi: r.pm25_aqi,
+    blackGlobe: r.black_globe_temp_c != null ? convertTemp(r.black_globe_temp_c, system) : null,
   }));
+
+  const outdoorChart = useChartToggle();
+  const windChart = useChartToggle();
+  const pressureChart = useChartToggle();
+  const aqiChart = useChartToggle();
+  const heatChart = useChartToggle();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1000 }}>
@@ -145,19 +156,22 @@ export function Environment() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
             <Card>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>
-                Outdoor
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div className="eyebrow">Outdoor</div>
+                <ChartToggle open={outdoorChart.open} onClick={outdoorChart.toggle} />
               </div>
               <MetricValue label="Temperature" value={loading ? '—' : formatTemp(latest?.outdoor_temp_c ?? null, system)} unit={tempUnit(system)} tooltip={metricInfo.outdoorTemp} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 {loading ? '—' : `${fmt(latest?.humidity_pct ?? null, 0)}% humidity`} · VPD {vpd !== null ? vpd.toFixed(2) : '—'} kPa
                 <InfoTooltip text={metricInfo.vpd} />
               </div>
+              {outdoorChart.open && <MiniTrendChart data={chartData} dataKey="temp" xKey="hour" color="var(--watch)" unit={tempUnit(system)} />}
             </Card>
 
             <Card>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>
-                Wind
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div className="eyebrow">Wind</div>
+                <ChartToggle open={windChart.open} onClick={windChart.toggle} />
               </div>
               <MetricValue label="Speed" value={loading ? '—' : formatWindSpeed(latest?.wind_mph ?? null, system)} unit={windSpeedUnit(system)} tooltip={metricInfo.windSpeed} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 13 }}>
@@ -173,17 +187,20 @@ export function Environment() {
                   <span style={{ color: 'var(--ink-faint)' }}>Direction not yet reported</span>
                 )}
               </div>
+              {windChart.open && <MiniTrendChart data={chartData} dataKey="windSpeed" xKey="hour" color="var(--insight)" unit={windSpeedUnit(system)} />}
             </Card>
 
             <Card>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>
-                Pressure & rain
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div className="eyebrow">Pressure & rain</div>
+                <ChartToggle open={pressureChart.open} onClick={pressureChart.toggle} />
               </div>
               <MetricValue label="Pressure" value={formatPressure(latest?.pressure_hpa ?? null, system)} unit={pressureUnit(system)} tooltip={metricInfo.pressure} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 {latest?.rain_in === 0 || latest?.rain_in == null ? 'No rain today' : `${formatRain(latest.rain_in, system)}${rainUnit(system)} today`}
                 <InfoTooltip text={metricInfo.rain} />
               </div>
+              {pressureChart.open && <MiniTrendChart data={chartData} dataKey="pressure" xKey="hour" color="var(--ok)" unit={pressureUnit(system)} />}
             </Card>
 
             <Card>
@@ -192,12 +209,16 @@ export function Environment() {
                   Air quality
                   <InfoTooltip text={metricInfo.aqi} />
                 </div>
-                {aqi && <StatusBadge status={aqi.status} size="sm" />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {aqi && <StatusBadge status={aqi.status} size="sm" />}
+                  <ChartToggle open={aqiChart.open} onClick={aqiChart.toggle} />
+                </div>
               </div>
               <MetricValue label="AQI" value={loading ? '—' : fmt(latest?.pm25_aqi ?? null, 0)} tooltip={metricInfo.aqi} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 {aqi ? aqi.label : '—'} · PM2.5 {loading ? '—' : fmt(latest?.pm25 ?? null, 0)} µg/m³
               </div>
+              {aqiChart.open && <MiniTrendChart data={chartData} dataKey="aqi" xKey="hour" color="var(--urgent)" />}
               {regionalAqi?.airnow_aqi != null && (
                 <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-faint)' }}>
                   Regional (AirNow, {regionalAqi.reporting_area}): AQI {regionalAqi.airnow_aqi.toFixed(0)} {regionalAqi.airnow_category}
@@ -216,13 +237,17 @@ export function Environment() {
                   Heat stress
                   <InfoTooltip text={metricInfo.heatStress} />
                 </div>
-                {heatStress && <StatusBadge status={heatStress} size="sm" />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {heatStress && <StatusBadge status={heatStress} size="sm" />}
+                  <ChartToggle open={heatChart.open} onClick={heatChart.toggle} />
+                </div>
               </div>
               <MetricValue label="Black globe" value={formatTemp(latest?.black_globe_temp_c ?? null, system)} unit={tempUnit(system)} tooltip={metricInfo.blackGlobe} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 WBGT {formatTemp(latest?.wbgt_c ?? null, system)}{tempUnit(system)}
                 <InfoTooltip text={metricInfo.wbgt} />
               </div>
+              {heatChart.open && <MiniTrendChart data={chartData} dataKey="blackGlobe" xKey="hour" color="var(--urgent)" unit={tempUnit(system)} />}
             </Card>
           </div>
 
