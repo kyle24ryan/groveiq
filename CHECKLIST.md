@@ -4,7 +4,7 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-13 (SMS compliance system built, pending A2P 10DLC approval + Access bypass).
+Last updated: 2026-08-13 (SMS verification flow confirmed working end-to-end; pending A2P 10DLC approval to actually deliver).
 
 ## Phase 0 — no hardware needed
 
@@ -70,14 +70,19 @@ until the probes show up.
       vision pipeline itself is built and camera-agnostic, so this is a
       hardware-install task once the camera's mounted, not new code.
 - [x] Email alert delivery (Resend) — live, watch+urgent tiers
-- [⚠️] SMS alert delivery (Twilio) — full technical build done: encrypted
-      phone storage, OTP verification, per-category consent, STOP/HELP/START
-      webhook, centralized consent-gated send service (see
-      `docs/sms-compliance-traceability.md`). **Not yet delivering** — first
-      live test hit Twilio error 30034 (unregistered A2P 10DLC number);
-      user has submitted Brand+Campaign registration, awaiting approval.
-      Also blocked on a Cloudflare Access bypass for `/privacy`, `/terms`,
-      and the Twilio webhook path (dashboard config, verification pending).
+- [x] SMS consent/verification flow — confirmed working end-to-end live:
+      phone entered, disclosure shown, OTP texted and verified, consent
+      promoted to `active`, category toggles correctly default off (see
+      `docs/sms-compliance-traceability.md`). No categories are checked yet
+      by user choice, so nothing sends today even though the pipe is open.
+- [ ] **SMS actual delivery** — blocked purely on Twilio's A2P 10DLC
+      campaign review (external, out of our hands). First live OTP test hit
+      error 30034 (unregistered number) before the user submitted
+      Brand+Campaign registration for `+14147683470`.
+- [x] Cloudflare Access bypass for `/privacy`, `/terms`, and the Twilio
+      webhook path — all three added and verified (public pages return 200
+      with no login; webhook reaches the Worker's own signature check
+      instead of Access's login page)
 
 **Phase 2 has started** — manual photo vision analysis and current-condition
 alerts are live. Daily per-tree diagnostics and scheduled camera capture are
@@ -119,11 +124,19 @@ still blocked on Phase 1 hardware.
 - [x] Hover tooltips explaining every displayed metric
 - [x] Live vs. demo data clearly labeled throughout the UI
 - [x] Cloudflare Access gating both `grove-iq.com` and `api.grove-iq.com` —
-      GitHub SSO (email-restricted policy), zero app code beyond CORS
-      credential support (`credentials: 'include'` on all frontend fetch
-      calls, `Access-Control-Allow-Credentials` on the Worker). A Cloudflare
-      Access service token (`.cf-access-service-token`, gitignored) lets
-      Claude Code's own testing bypass the interactive login.
+      GitHub SSO (email-restricted policy). A Cloudflare Access service
+      token (`.cf-access-service-token`, gitignored) lets Claude Code's own
+      testing bypass the interactive login.
+- [x] **Real bug found and fixed**: Access blocks anonymous CORS preflight
+      OPTIONS requests with a bare 403 (browsers never attach credentials to
+      a preflight, by the fetch spec) — this silently broke every POST/PUT
+      call from the SPA the first time one was actually exercised through a
+      real browser (all earlier testing was via `curl` with the service
+      token, which never triggers a preflight). Fixed by routing
+      `grove-iq.com/api/*` to the same Worker (same-origin, never
+      preflights) instead of relying on cross-origin `api.grove-iq.com` +
+      `credentials: 'include'`. `api.grove-iq.com` stays live for direct
+      testing; local dev falls back to it for GET-only screens.
 
 ## Open decisions carried from SPEC.md section 7 (still open)
 
