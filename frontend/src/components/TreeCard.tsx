@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Card } from './Card';
 import { StatusBadge } from './StatusBadge';
 import { Sparkline } from './Sparkline';
-import { dailyReadingsFor, insightFor } from '../data/mockData';
+import { dailyReadingsFor, insightFor, analyzeTree } from '../data/mockData';
 import type { Tree } from '../data/types';
 
 const sparklineColor: Record<'ok' | 'watch' | 'urgent', string> = {
@@ -14,9 +14,9 @@ const sparklineColor: Record<'ok' | 'watch' | 'urgent', string> = {
 export function TreeCard({ tree }: { tree: Tree }) {
   const readings = dailyReadingsFor(tree.id, 14);
   const insight = insightFor(tree.id);
-  const latest = readings[readings.length - 1];
-  const previous = readings[readings.length - 2];
-  const deltaPct = Math.round(((latest.soilMoistureAvg - previous.soilMoistureAvg) / previous.soilMoistureAvg) * 1000) / 10;
+  // Shares analyzeTree with insightFor/statusFor so the arrow can never
+  // disagree with the insight text below it.
+  const { latest, changePct } = analyzeTree(tree.id);
 
   return (
     <Link to={`/trees/${tree.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -36,8 +36,8 @@ export function TreeCard({ tree }: { tree: Tree }) {
               <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
                 {latest.soilMoistureAvg}%
               </span>
-              <span className={`status-${deltaPct < 0 ? 'watch' : 'ok'}`} style={{ fontSize: 12 }}>
-                {deltaPct < 0 ? '↓' : '↑'} {Math.abs(deltaPct)}%
+              <span className={`status-${changePct < 0 ? 'watch' : 'ok'}`} style={{ fontSize: 12 }}>
+                {changePct < 0 ? '↓' : '↑'} {Math.abs(changePct)}%
               </span>
             </div>
           </div>

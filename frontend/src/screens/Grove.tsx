@@ -1,7 +1,7 @@
 import { TreeCard } from '../components/TreeCard';
 import { InsightPanel } from '../components/InsightPanel';
 import { Card } from '../components/Card';
-import { trees, allInsights, currentConditions } from '../data/mockData';
+import { trees, allInsights, currentConditions, waterDemandNow } from '../data/mockData';
 import type { Status } from '../data/types';
 
 const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
@@ -23,6 +23,7 @@ export function Grove() {
   const needsAttention = counts.urgent + counts.watch;
   const priorityInsight = insights[0];
   const priorityTree = trees.find((t) => t.id === priorityInsight.treeId);
+  const demand = waterDemandNow();
   const sortedTrees = [...trees].sort((a, b) => {
     const aStatus = insights.find((i) => i.treeId === a.id)!.status;
     const bStatus = insights.find((i) => i.treeId === b.id)!.status;
@@ -65,7 +66,7 @@ export function Grove() {
         <Divider />
         <span className="status-urgent">{counts.urgent} attention</span>
         <Divider />
-        <span>{Math.round((currentConditions.outdoorTempC * 9) / 5 + 32)}°F</span>
+        <span>{currentConditions.outdoorTempC}°C</span>
         <Divider />
         <span>{currentConditions.humidityPct}% RH</span>
         <Divider />
@@ -92,7 +93,7 @@ export function Grove() {
           Next 24-48 hours
         </div>
         <p style={{ fontSize: 13.5 }}>
-          Moderate water demand expected through tomorrow afternoon. No frost or high-wind risk in the current forecast window.
+          {demand.label} water demand right now. No frost or high-wind risk in the current forecast window.
         </p>
       </Card>
     </div>

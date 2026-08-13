@@ -168,7 +168,7 @@ export function Environment() {
           Grove impact
         </div>
         <p style={{ fontSize: 13.5 }}>
-          High evaporative demand is expected through this afternoon.{' '}
+          {demand.label} evaporative demand right now (VPD {vpd} kPa).{' '}
           {priorityTree && priorityInsight.implication ? `${priorityTree.name} ${priorityInsight.implication.toLowerCase()}` : 'No trees are projected to cross a threshold today.'}
         </p>
       </Card>

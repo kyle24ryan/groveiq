@@ -201,6 +201,16 @@ function dayNoise(seed: number, dayIndex: number): number {
   return (h >>> 0) / 4294967295;
 }
 
+// Local calendar date, not toISOString().slice(0,10) — that formats in UTC,
+// so anyone west of UTC in the evening sees tomorrow's date on "today's"
+// reading.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function dailyReadingsFor(treeId: string, days = 30): DailyReading[] {
   const seed = seedFromString(treeId);
   const readings: DailyReading[] = [];
@@ -217,7 +227,7 @@ export function dailyReadingsFor(treeId: string, days = 30): DailyReading[] {
     const soilEc = 1.2 + dayNoise(seed + 3, dayIndex) * 0.8;
 
     readings.push({
-      date: date.toISOString().slice(0, 10),
+      date: localDateStr(date),
       soilMoistureAvg: Math.round(moisture * 10) / 10,
       soilMoistureMin: Math.round((moisture - spread) * 10) / 10,
       soilMoistureMax: Math.round((moisture + spread) * 10) / 10,
@@ -228,79 +238,117 @@ export function dailyReadingsFor(treeId: string, days = 30): DailyReading[] {
   return readings;
 }
 
-export function statusFor(treeId: string): Status {
-  const rand = seededRandom(seedFromString(treeId + 'status'));
-  const roll = rand();
-  if (roll < 0.15) return 'urgent';
-  if (roll < 0.4) return 'watch';
-  return 'ok';
-}
-
-const likelyCauses: Record<Status, string[]> = {
-  ok: ['Stable weather and consistent watering cadence.'],
-  watch: [
-    'Higher temperatures and wind likely contributed.',
-    'Longer stretch between waterings than usual.',
-    'Rising EC suggests it may be due for a flush.',
-  ],
-  urgent: ['A warm, dry stretch combined with a missed watering.', 'Faster-than-expected drainage after the last watering.'],
+// Single source of truth for "how is this tree doing" — status, the tree
+// card's delta arrow, and the insight text all derive from this so they
+// can't disagree with each other or with the displayed moisture value.
+// Two independent dimensions, per the interpretation model: current level
+// vs. threshold, and rate of change vs. this tree's own typical swing.
+export type TreeAnalysis = {
+  tree: Tree;
+  latest: DailyReading;
+  changePct: number; // latest - previous, in percentage points (not a ratio)
+  typicalSwing: number; // avg abs day-over-day change over trailing history
+  status: Status;
+  belowThreshold: boolean;
+  aboveThreshold: boolean;
+  decliningFast: boolean;
+  daysToThreshold: number | null;
 };
 
-const actions: Record<Status, string | undefined> = {
-  ok: undefined,
-  watch: 'Plan to water within the next day or two.',
-  urgent: 'Water today and recheck this evening.',
-};
-
-export function insightFor(treeId: string): Insight {
-  const status = statusFor(treeId);
+export function analyzeTree(treeId: string): TreeAnalysis {
+  const tree = trees.find((t) => t.id === treeId)!;
   const readings = dailyReadingsFor(treeId, 15);
   const latest = readings[readings.length - 1];
   const previous = readings[readings.length - 2];
-  const baselineAvg = readings.slice(0, 14).reduce((sum, r) => sum + r.soilMoistureAvg, 0) / 14;
-  const overnightDeltaPct = Math.round(((latest.soilMoistureAvg - previous.soilMoistureAvg) / previous.soilMoistureAvg) * 1000) / 10;
-  const baselineDeltaPct = Math.round(((latest.soilMoistureAvg - baselineAvg) / baselineAvg) * 1000) / 10;
+  const changePct = Math.round((latest.soilMoistureAvg - previous.soilMoistureAvg) * 10) / 10;
+
+  const dayChanges: number[] = [];
+  for (let i = 2; i < readings.length; i++) {
+    dayChanges.push(Math.abs(readings[i].soilMoistureAvg - readings[i - 1].soilMoistureAvg));
+  }
+  const typicalSwing = dayChanges.reduce((s, d) => s + d, 0) / dayChanges.length;
+
+  const belowThreshold = latest.soilMoistureAvg < tree.soilMoistureThresholdLow;
+  const aboveThreshold = latest.soilMoistureAvg > tree.soilMoistureThresholdHigh;
+  // Require both a multiple of the typical swing AND a minimum absolute
+  // move, so a tree with near-zero typical swing doesn't get flagged over
+  // ordinary noise (the unstable-multiplier problem).
+  const decliningFast = changePct < 0 && Math.abs(changePct) > Math.max(typicalSwing * 2, 3);
+
+  let status: Status = 'ok';
+  let daysToThreshold: number | null = null;
+
+  if (belowThreshold) {
+    status = 'urgent';
+  } else if (decliningFast) {
+    const bufferPct = latest.soilMoistureAvg - tree.soilMoistureThresholdLow;
+    daysToThreshold = Math.round((bufferPct / Math.abs(changePct)) * 10) / 10;
+    status = daysToThreshold < 1.5 ? 'urgent' : 'watch';
+  } else if (aboveThreshold) {
+    status = 'watch';
+  }
+
+  return { tree, latest, changePct, typicalSwing, status, belowThreshold, aboveThreshold, decliningFast, daysToThreshold };
+}
+
+export function statusFor(treeId: string): Status {
+  return analyzeTree(treeId).status;
+}
+
+const likelyCauses = [
+  'Higher temperatures and wind likely contributed.',
+  'Longer stretch between waterings than usual.',
+  'Rising EC suggests it may be due for a flush.',
+];
+
+export function insightFor(treeId: string): Insight {
+  const a = analyzeTree(treeId);
   const rand = seededRandom(seedFromString(treeId + 'insight'));
 
-  const titles: Record<Status, string> = {
-    ok: 'GroveIQ: conditions are stable.',
-    watch: 'GroveIQ detected faster-than-usual drying.',
-    urgent: 'GroveIQ detected unusual drying overnight.',
-  };
+  let title: string;
+  let evidence: string;
+  let comparison: string | undefined;
+  let likelyCause: string | undefined;
+  let implication: string | undefined;
+  let action: string | undefined;
 
-  const evidence =
-    status === 'ok'
-      ? `Soil moisture at ${latest.soilMoistureAvg}%, within ${Math.abs(baselineDeltaPct)}% of its 14-day baseline.`
-      : `Soil moisture fell ${Math.abs(overnightDeltaPct)}% overnight to ${latest.soilMoistureAvg}%.`;
-
-  const comparison =
-    status === 'ok'
-      ? undefined
-      : `${Math.abs(baselineDeltaPct / (overnightDeltaPct || 1)).toFixed(1)}x faster than its 14-day baseline rate.`;
-
-  const causeOptions = likelyCauses[status];
-  const likelyCause = status === 'ok' ? undefined : causeOptions[Math.floor(rand() * causeOptions.length)];
-
-  const hoursToThreshold = Math.max(2, Math.round(12 + rand() * 10));
-  const thresholdTime = new Date();
-  thresholdTime.setHours(thresholdTime.getHours() + hoursToThreshold);
-  const implication =
-    status === 'urgent'
-      ? `May reach its moisture threshold around ${thresholdTime.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} if untreated.`
-      : status === 'watch'
-        ? 'Likely to cross its low threshold within 2-3 days at the current rate.'
+  if (a.belowThreshold) {
+    title = 'GroveIQ: soil moisture below threshold.';
+    evidence = `Soil moisture at ${a.latest.soilMoistureAvg}%, below its ${a.tree.soilMoistureThresholdLow}% threshold.`;
+    likelyCause = likelyCauses[Math.floor(rand() * likelyCauses.length)];
+    action = 'Water today and recheck this evening.';
+  } else if (a.decliningFast) {
+    title = 'GroveIQ detected an abnormal drying rate.';
+    evidence = `Soil moisture is currently within its preferred range at ${a.latest.soilMoistureAvg}%, but declined ${Math.abs(a.changePct)} percentage points overnight.`;
+    comparison =
+      a.typicalSwing < 1
+        ? 'a larger move than its usual overnight change'
+        : `about ${Math.min(Math.abs(a.changePct) / a.typicalSwing, 9).toFixed(1)}x its typical overnight change`;
+    likelyCause = likelyCauses[Math.floor(rand() * likelyCauses.length)];
+    implication =
+      a.daysToThreshold !== null
+        ? `Projected to cross its threshold in about ${a.daysToThreshold} day${a.daysToThreshold === 1 ? '' : 's'} at this rate.`
         : undefined;
+    action = a.status === 'urgent' ? 'Water today and recheck this evening.' : 'Recheck tomorrow and plan to water within 1-2 days.';
+  } else if (a.aboveThreshold) {
+    title = 'GroveIQ: soil moisture above preferred range.';
+    evidence = `Soil moisture at ${a.latest.soilMoistureAvg}%, above its ${a.tree.soilMoistureThresholdHigh}% threshold.`;
+    action = 'Hold off watering and check drainage.';
+  } else {
+    title = 'GroveIQ: conditions are stable.';
+    evidence = `Soil moisture at ${a.latest.soilMoistureAvg}%, within its ${a.tree.soilMoistureThresholdLow}-${a.tree.soilMoistureThresholdHigh}% preferred range.`;
+  }
 
   return {
     id: `${treeId}-insight`,
     treeId,
-    status,
-    title: titles[status],
+    status: a.status,
+    title,
     evidence,
     comparison,
     likelyCause,
     implication,
-    action: actions[status],
+    action,
     ts: new Date().toISOString(),
   };
 }
@@ -332,7 +380,7 @@ export function milestonesFor(treeId: string): Milestone[] {
     milestones.push({
       id: i,
       treeId,
-      date: date.toISOString().slice(0, 10),
+      date: localDateStr(date),
       label: labels[Math.floor(rand() * labels.length)],
       source: rand() > 0.5 ? 'ai' : 'manual',
     });
@@ -398,7 +446,7 @@ export function forecastNext7Days(): Forecast[] {
     const date = new Date();
     date.setDate(date.getDate() + i);
     days.push({
-      date: date.toISOString().slice(0, 10),
+      date: localDateStr(date),
       lowTempF: Math.round(48 + rand() * 10),
       highTempF: Math.round(70 + rand() * 12),
       windGustMph: Math.round(5 + rand() * 20),
