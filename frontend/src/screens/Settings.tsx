@@ -53,8 +53,8 @@ export function Settings() {
           Data mode
         </div>
         <p style={{ fontSize: 13.5 }}>
-          This app is currently showing demo data (deterministic mock readings), not the live feed. The weather gateway above
-          really is live and polling into the database — the frontend just isn't wired to read from it yet.
+          Environment and Grove's weather strip now read the live feed from the weather gateway. Per-tree readings (soil
+          moisture, EC, status) are still demo data — soil probes haven't arrived yet, so there's nothing real to show there.
         </p>
       </Card>
 
