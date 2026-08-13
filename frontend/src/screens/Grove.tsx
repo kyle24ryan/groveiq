@@ -6,6 +6,8 @@ import { trees, allInsights, vpdKPa, waterDemandNow } from '../data/mockData';
 import { fetchLatestConditions, freshnessLabel, type ConditionsReading } from '../lib/api';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit, formatRain, rainUnit } from '../lib/units';
+import { InfoTooltip } from '../components/InfoTooltip';
+import { metricInfo } from '../data/metricInfo';
 import type { Status } from '../data/types';
 
 const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
@@ -122,6 +124,7 @@ export function Grove() {
         </div>
         <p style={{ fontSize: 13.5 }}>
           {demand.label} water demand right now. No frost or high-wind risk in the current forecast window.
+          <InfoTooltip text={metricInfo.waterDemand} />
         </p>
       </Card>
     </div>

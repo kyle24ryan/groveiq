@@ -4,6 +4,7 @@ import { MetricValue } from '../components/MetricValue';
 import { trees, dailyReadingsFor, milestonesFor } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
+import { metricInfo } from '../data/metricInfo';
 
 const RANGE_DAYS = 90;
 
@@ -109,9 +110,9 @@ export function Timeline() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
           <MetricValue label="Date" value={reading.date} />
-          <MetricValue label="Soil moisture" value={reading.soilMoistureAvg} unit="%" />
-          <MetricValue label="Soil temp" value={formatTemp(reading.soilTempAvg, system)} unit={tempUnit(system)} />
-          <MetricValue label="EC" value={reading.soilEcAvg} unit="mS/cm" />
+          <MetricValue label="Soil moisture" value={reading.soilMoistureAvg} unit="%" tooltip={metricInfo.soilMoisture} />
+          <MetricValue label="Soil temp" value={formatTemp(reading.soilTempAvg, system)} unit={tempUnit(system)} tooltip={metricInfo.soilTemp} />
+          <MetricValue label="EC" value={reading.soilEcAvg} unit="mS/cm" tooltip={metricInfo.ec} />
         </div>
       </Card>
 

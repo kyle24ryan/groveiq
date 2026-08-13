@@ -3,6 +3,8 @@ import { Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, 
 import { Card } from '../components/Card';
 import { MetricValue } from '../components/MetricValue';
 import { StatusBadge } from '../components/StatusBadge';
+import { InfoTooltip } from '../components/InfoTooltip';
+import { metricInfo } from '../data/metricInfo';
 import { trees, vpdKPa, waterDemandNow, forecastNext7Days, insightFor } from '../data/mockData';
 import { fetchLatestConditions, fetchConditionsHistory, freshnessLabel, type ConditionsReading } from '../lib/api';
 import { useUnits } from '../contexts/UnitsContext';
@@ -92,6 +94,7 @@ export function Environment() {
           >
             {loading ? 'Loading…' : error ? 'Live feed unreachable' : freshness.label}
           </span>
+          {!loading && !error && <InfoTooltip text={metricInfo.dataFreshness} />}
         </p>
       </div>
 
@@ -110,9 +113,10 @@ export function Environment() {
               <div className="eyebrow" style={{ marginBottom: 8 }}>
                 Outdoor
               </div>
-              <MetricValue label="Temperature" value={loading ? '—' : formatTemp(latest?.outdoor_temp_c ?? null, system)} unit={tempUnit(system)} />
+              <MetricValue label="Temperature" value={loading ? '—' : formatTemp(latest?.outdoor_temp_c ?? null, system)} unit={tempUnit(system)} tooltip={metricInfo.outdoorTemp} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 {loading ? '—' : `${fmt(latest?.humidity_pct ?? null, 0)}% humidity`} · VPD {vpd !== null ? vpd.toFixed(2) : '—'} kPa
+                <InfoTooltip text={metricInfo.vpd} />
               </div>
             </Card>
 
@@ -120,7 +124,7 @@ export function Environment() {
               <div className="eyebrow" style={{ marginBottom: 8 }}>
                 Wind
               </div>
-              <MetricValue label="Speed" value={loading ? '—' : formatWindSpeed(latest?.wind_mph ?? null, system)} unit={windSpeedUnit(system)} />
+              <MetricValue label="Speed" value={loading ? '—' : formatWindSpeed(latest?.wind_mph ?? null, system)} unit={windSpeedUnit(system)} tooltip={metricInfo.windSpeed} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 13 }}>
                 {latest?.wind_dir_deg != null ? (
                   <>
@@ -128,6 +132,7 @@ export function Environment() {
                       ↑
                     </span>
                     {compassLabel(latest.wind_dir_deg)} ({latest.wind_dir_deg}°)
+                    <InfoTooltip text={metricInfo.windDirection} />
                   </>
                 ) : (
                   <span style={{ color: 'var(--ink-faint)' }}>Direction not yet reported</span>
@@ -139,28 +144,36 @@ export function Environment() {
               <div className="eyebrow" style={{ marginBottom: 8 }}>
                 Pressure & rain
               </div>
-              <MetricValue label="Pressure" value={formatPressure(latest?.pressure_hpa ?? null, system)} unit={pressureUnit(system)} />
+              <MetricValue label="Pressure" value={formatPressure(latest?.pressure_hpa ?? null, system)} unit={pressureUnit(system)} tooltip={metricInfo.pressure} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 {latest?.rain_in === 0 || latest?.rain_in == null ? 'No rain today' : `${formatRain(latest.rain_in, system)}${rainUnit(system)} today`}
+                <InfoTooltip text={metricInfo.rain} />
               </div>
             </Card>
 
             <Card>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div className="eyebrow">Air quality</div>
+                <div className="eyebrow">
+                  Air quality
+                  <InfoTooltip text={metricInfo.aqi} />
+                </div>
                 {aqi && <StatusBadge status={aqi} size="sm" />}
               </div>
-              <MetricValue label="PM2.5" value={loading ? '—' : fmt(latest?.pm25 ?? null, 0)} unit="µg/m³" />
+              <MetricValue label="PM2.5" value={loading ? '—' : fmt(latest?.pm25 ?? null, 0)} unit="µg/m³" tooltip={metricInfo.pm25} />
             </Card>
 
             <Card>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div className="eyebrow">Heat stress</div>
+                <div className="eyebrow">
+                  Heat stress
+                  <InfoTooltip text={metricInfo.heatStress} />
+                </div>
                 {heatStress && <StatusBadge status={heatStress} size="sm" />}
               </div>
-              <MetricValue label="Black globe" value={formatTemp(latest?.black_globe_temp_c ?? null, system)} unit={tempUnit(system)} />
+              <MetricValue label="Black globe" value={formatTemp(latest?.black_globe_temp_c ?? null, system)} unit={tempUnit(system)} tooltip={metricInfo.blackGlobe} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 WBGT {formatTemp(latest?.wbgt_c ?? null, system)}{tempUnit(system)}
+                <InfoTooltip text={metricInfo.wbgt} />
               </div>
             </Card>
           </div>
@@ -208,6 +221,7 @@ export function Environment() {
             <Card>
               <div className="eyebrow" style={{ marginBottom: 6 }}>
                 Water demand
+                <InfoTooltip text={metricInfo.waterDemand} />
               </div>
               {demand ? (
                 <>

@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { Card } from './Card';
 import { StatusBadge } from './StatusBadge';
 import { Sparkline } from './Sparkline';
+import { InfoTooltip } from './InfoTooltip';
+import { metricInfo } from '../data/metricInfo';
 import { dailyReadingsFor, insightFor, analyzeTree } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
@@ -34,7 +36,10 @@ export function TreeCard({ tree }: { tree: Tree }) {
 
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <div>
-            <div className="eyebrow">Soil moisture</div>
+            <div className="eyebrow">
+              Soil moisture
+              <InfoTooltip text={metricInfo.soilMoisture} />
+            </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
               <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
                 {latest.soilMoistureAvg}%

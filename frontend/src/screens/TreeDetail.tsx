@@ -4,6 +4,8 @@ import { StatusBadge } from '../components/StatusBadge';
 import { MetricValue } from '../components/MetricValue';
 import { ReadingChart } from '../components/ReadingChart';
 import { InsightPanel } from '../components/InsightPanel';
+import { InfoTooltip } from '../components/InfoTooltip';
+import { metricInfo } from '../data/metricInfo';
 import { trees, speciesReference, dailyReadingsFor, insightFor, milestonesFor, lastWateredFor } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, formatTemp, tempUnit } from '../lib/units';
@@ -75,16 +77,17 @@ export function TreeDetail() {
               unit="%"
               delta={moistureInRange ? 'In range' : 'Out of range'}
               deltaTone={moistureInRange ? 'ok' : 'watch'}
+              tooltip={metricInfo.soilMoisture}
             />
           </Card>
           <Card>
-            <MetricValue label="EC" value={latest.soilEcAvg} unit="mS/cm" delta={ecInRange ? 'In range' : 'Elevated'} deltaTone={ecInRange ? 'ok' : 'watch'} />
+            <MetricValue label="EC" value={latest.soilEcAvg} unit="mS/cm" delta={ecInRange ? 'In range' : 'Elevated'} deltaTone={ecInRange ? 'ok' : 'watch'} tooltip={metricInfo.ec} />
           </Card>
           <Card>
-            <MetricValue label="Soil temp" value={formatTemp(latest.soilTempAvg, system)} unit={tempUnit(system)} />
+            <MetricValue label="Soil temp" value={formatTemp(latest.soilTempAvg, system)} unit={tempUnit(system)} tooltip={metricInfo.soilTemp} />
           </Card>
           <Card>
-            <MetricValue label="Last watered" value={lastWatered} />
+            <MetricValue label="Last watered" value={lastWatered} tooltip={metricInfo.lastWatered} />
           </Card>
         </div>
       </div>
@@ -96,19 +99,28 @@ export function TreeDetail() {
         <Card>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, fontSize: 13 }}>
             <div>
-              <div style={{ color: 'var(--ink-soft)' }}>Moisture range</div>
+              <div style={{ color: 'var(--ink-soft)' }}>
+                Moisture range
+                <InfoTooltip text={metricInfo.moistureRange} />
+              </div>
               <div className="mono" style={{ marginTop: 2 }}>
                 {tree.soilMoistureThresholdLow}-{tree.soilMoistureThresholdHigh}%
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--ink-soft)' }}>EC ceiling</div>
+              <div style={{ color: 'var(--ink-soft)' }}>
+                EC ceiling
+                <InfoTooltip text={metricInfo.ecCeiling} />
+              </div>
               <div className="mono" style={{ marginTop: 2 }}>
                 {tree.ecThresholdHigh} mS/cm
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--ink-soft)' }}>Dormancy trigger</div>
+              <div style={{ color: 'var(--ink-soft)' }}>
+                Dormancy trigger
+                <InfoTooltip text={metricInfo.dormancyTrigger} />
+              </div>
               <div className="mono" style={{ marginTop: 2 }}>
                 {formatTemp(tree.dormancySoilTempC, system)}{tempUnit(system)} soil temp
               </div>
