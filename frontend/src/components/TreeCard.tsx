@@ -3,6 +3,8 @@ import { Card } from './Card';
 import { StatusBadge } from './StatusBadge';
 import { Sparkline } from './Sparkline';
 import { dailyReadingsFor, insightFor, analyzeTree } from '../data/mockData';
+import { useUnits } from '../contexts/UnitsContext';
+import { formatTemp, tempUnit } from '../lib/units';
 import type { Tree } from '../data/types';
 
 const sparklineColor: Record<'ok' | 'watch' | 'urgent', string> = {
@@ -12,6 +14,7 @@ const sparklineColor: Record<'ok' | 'watch' | 'urgent', string> = {
 };
 
 export function TreeCard({ tree }: { tree: Tree }) {
+  const { system } = useUnits();
   const readings = dailyReadingsFor(tree.id, 14);
   const insight = insightFor(tree.id);
   // Shares analyzeTree with insightFor/statusFor so the arrow can never
@@ -46,7 +49,7 @@ export function TreeCard({ tree }: { tree: Tree }) {
 
         <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-soft)' }}>
           <span className="mono">EC {latest.soilEcAvg}</span>
-          <span className="mono">{latest.soilTempAvg}°C</span>
+          <span className="mono">{formatTemp(latest.soilTempAvg, system)}{tempUnit(system)}</span>
         </div>
 
         <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', paddingTop: 10, borderTop: '1px solid var(--border)' }}>

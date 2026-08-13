@@ -5,6 +5,8 @@ import { MetricValue } from '../components/MetricValue';
 import { StatusBadge } from '../components/StatusBadge';
 import { trees, vpdKPa, waterDemandNow, forecastNext7Days, insightFor } from '../data/mockData';
 import { fetchLatestConditions, fetchConditionsHistory, freshnessLabel, type ConditionsReading } from '../lib/api';
+import { useUnits } from '../contexts/UnitsContext';
+import { convertTemp, tempUnit, formatTemp, formatWindSpeed, windSpeedUnit, formatPressure, pressureUnit, formatRain, rainUnit } from '../lib/units';
 import type { Status } from '../data/types';
 
 const compassPoints = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -33,6 +35,7 @@ function fmt(value: number | null, digits = 1): string {
 }
 
 export function Environment() {
+  const { system } = useUnits();
   const [latest, setLatest] = useState<ConditionsReading | null>(null);
   const [history, setHistory] = useState<ConditionsReading[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +76,7 @@ export function Environment() {
 
   const chartData = history.map((r) => ({
     hour: new Date(r.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
-    tempC: r.outdoor_temp_c,
+    temp: r.outdoor_temp_c != null ? convertTemp(r.outdoor_temp_c, system) : null,
     humidityPct: r.humidity_pct,
   }));
 
@@ -107,7 +110,7 @@ export function Environment() {
               <div className="eyebrow" style={{ marginBottom: 8 }}>
                 Outdoor
               </div>
-              <MetricValue label="Temperature" value={loading ? '—' : fmt(latest?.outdoor_temp_c ?? null)} unit="°C" />
+              <MetricValue label="Temperature" value={loading ? '—' : formatTemp(latest?.outdoor_temp_c ?? null, system)} unit={tempUnit(system)} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 {loading ? '—' : `${fmt(latest?.humidity_pct ?? null, 0)}% humidity`} · VPD {vpd !== null ? vpd.toFixed(2) : '—'} kPa
               </div>
@@ -117,7 +120,7 @@ export function Environment() {
               <div className="eyebrow" style={{ marginBottom: 8 }}>
                 Wind
               </div>
-              <MetricValue label="Speed" value={loading ? '—' : fmt(latest?.wind_mph ?? null)} unit="mph" />
+              <MetricValue label="Speed" value={loading ? '—' : formatWindSpeed(latest?.wind_mph ?? null, system)} unit={windSpeedUnit(system)} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 13 }}>
                 {latest?.wind_dir_deg != null ? (
                   <>
@@ -136,9 +139,9 @@ export function Environment() {
               <div className="eyebrow" style={{ marginBottom: 8 }}>
                 Pressure & rain
               </div>
-              <MetricValue label="Pressure" value={latest?.pressure_hpa != null ? fmt(latest.pressure_hpa) : '—'} unit="hPa" />
+              <MetricValue label="Pressure" value={formatPressure(latest?.pressure_hpa ?? null, system)} unit={pressureUnit(system)} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
-                {latest?.rain_in === 0 || latest?.rain_in == null ? 'No rain today' : `${latest.rain_in}in today`}
+                {latest?.rain_in === 0 || latest?.rain_in == null ? 'No rain today' : `${formatRain(latest.rain_in, system)}${rainUnit(system)} today`}
               </div>
             </Card>
 
@@ -155,8 +158,10 @@ export function Environment() {
                 <div className="eyebrow">Heat stress</div>
                 {heatStress && <StatusBadge status={heatStress} size="sm" />}
               </div>
-              <MetricValue label="Black globe" value={latest?.black_globe_temp_c != null ? fmt(latest.black_globe_temp_c) : '—'} unit="°C" />
-              <div style={{ marginTop: 10, fontSize: 13 }}>WBGT {latest?.wbgt_c != null ? fmt(latest.wbgt_c) : '—'}°C</div>
+              <MetricValue label="Black globe" value={formatTemp(latest?.black_globe_temp_c ?? null, system)} unit={tempUnit(system)} />
+              <div style={{ marginTop: 10, fontSize: 13 }}>
+                WBGT {formatTemp(latest?.wbgt_c ?? null, system)}{tempUnit(system)}
+              </div>
             </Card>
           </div>
 
@@ -183,13 +188,13 @@ export function Environment() {
                     <YAxis yAxisId="temp" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} width={32} />
                     <YAxis yAxisId="humidity" orientation="right" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} width={32} />
                     <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                    <Area yAxisId="temp" type="monotone" dataKey="tempC" stroke="var(--watch)" fill="url(#tempGradient)" strokeWidth={1.75} connectNulls />
+                    <Area yAxisId="temp" type="monotone" dataKey="temp" stroke="var(--watch)" fill="url(#tempGradient)" strokeWidth={1.75} connectNulls />
                     <Line yAxisId="humidity" type="monotone" dataKey="humidityPct" stroke="var(--insight)" strokeWidth={1.5} dot={false} connectNulls />
                   </ComposedChart>
                 </ResponsiveContainer>
                 <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
                   <span>
-                    <span style={{ color: 'var(--watch)' }}>■</span> Temp (°C)
+                    <span style={{ color: 'var(--watch)' }}>■</span> Temp ({tempUnit(system)})
                   </span>
                   <span>
                     <span style={{ color: 'var(--insight)' }}>■</span> Humidity (%)
@@ -222,7 +227,9 @@ export function Environment() {
                 Rain outlook
                 <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--insight)', textTransform: 'none' }}>Forecast (demo)</span>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 600 }}>{latest?.rain_in === 0 || latest?.rain_in == null ? 'None observed today' : `${latest.rain_in}in today`}</div>
+              <div style={{ fontSize: 22, fontWeight: 600 }}>
+                {latest?.rain_in === 0 || latest?.rain_in == null ? 'None observed today' : `${formatRain(latest.rain_in, system)}${rainUnit(system)} today`}
+              </div>
               <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 6 }}>
                 Next 48h: {rainNext48h.map((d) => `${d.precipChancePct}%`).join(' / ')} chance of precipitation.
               </p>

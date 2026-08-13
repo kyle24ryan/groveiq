@@ -5,8 +5,11 @@ import { MetricValue } from '../components/MetricValue';
 import { ReadingChart } from '../components/ReadingChart';
 import { InsightPanel } from '../components/InsightPanel';
 import { trees, speciesReference, dailyReadingsFor, insightFor, milestonesFor, lastWateredFor } from '../data/mockData';
+import { useUnits } from '../contexts/UnitsContext';
+import { convertTemp, formatTemp, tempUnit } from '../lib/units';
 
 export function TreeDetail() {
+  const { system } = useUnits();
   const { treeId } = useParams<{ treeId: string }>();
   const tree = trees.find((t) => t.id === treeId);
 
@@ -28,6 +31,7 @@ export function TreeDetail() {
 
   const moistureInRange = latest.soilMoistureAvg >= tree.soilMoistureThresholdLow && latest.soilMoistureAvg <= tree.soilMoistureThresholdHigh;
   const ecInRange = latest.soilEcAvg <= tree.ecThresholdHigh;
+  const readingsInDisplayUnits = readings.map((r) => ({ ...r, soilTempAvg: convertTemp(r.soilTempAvg, system) }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 960 }}>
@@ -77,7 +81,7 @@ export function TreeDetail() {
             <MetricValue label="EC" value={latest.soilEcAvg} delta={ecInRange ? 'In range' : 'Elevated'} deltaTone={ecInRange ? 'ok' : 'watch'} />
           </Card>
           <Card>
-            <MetricValue label="Soil temp" value={latest.soilTempAvg} unit="°C" />
+            <MetricValue label="Soil temp" value={formatTemp(latest.soilTempAvg, system)} unit={tempUnit(system)} />
           </Card>
           <Card>
             <MetricValue label="Last watered" value={lastWatered} />
@@ -106,7 +110,7 @@ export function TreeDetail() {
             <div>
               <div style={{ color: 'var(--ink-soft)' }}>Dormancy trigger</div>
               <div className="mono" style={{ marginTop: 2 }}>
-                {tree.dormancySoilTempC}°C soil temp
+                {formatTemp(tree.dormancySoilTempC, system)}{tempUnit(system)} soil temp
               </div>
             </div>
             <div>
@@ -171,7 +175,7 @@ export function TreeDetail() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <ReadingChart title="Soil moisture — last 30 days" data={readings} dataKey="soilMoistureAvg" color="var(--ok)" unit="%" />
-        <ReadingChart title="Soil temperature — last 30 days" data={readings} dataKey="soilTempAvg" color="var(--insight)" unit="°C" />
+        <ReadingChart title="Soil temperature — last 30 days" data={readingsInDisplayUnits} dataKey="soilTempAvg" color="var(--insight)" unit={tempUnit(system)} />
       </div>
       <ReadingChart title="Soil EC — last 30 days" data={readings} dataKey="soilEcAvg" color="var(--watch)" />
 

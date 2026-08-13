@@ -4,6 +4,8 @@ import { InsightPanel } from '../components/InsightPanel';
 import { Card } from '../components/Card';
 import { trees, allInsights, vpdKPa, waterDemandNow } from '../data/mockData';
 import { fetchLatestConditions, freshnessLabel, type ConditionsReading } from '../lib/api';
+import { useUnits } from '../contexts/UnitsContext';
+import { formatTemp, tempUnit, formatRain, rainUnit } from '../lib/units';
 import type { Status } from '../data/types';
 
 const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
@@ -16,6 +18,7 @@ function greeting(): string {
 }
 
 export function Grove() {
+  const { system } = useUnits();
   const [latest, setLatest] = useState<ConditionsReading | null>(null);
 
   useEffect(() => {
@@ -87,13 +90,13 @@ export function Grove() {
         <Divider />
         <span className="status-urgent">{counts.urgent} attention</span>
         <Divider />
-        <span>{latest?.outdoor_temp_c != null ? `${latest.outdoor_temp_c}°C` : '—'}</span>
+        <span>{latest?.outdoor_temp_c != null ? `${formatTemp(latest.outdoor_temp_c, system)}${tempUnit(system)}` : '—'}</span>
         <Divider />
         <span>{latest?.humidity_pct != null ? `${latest.humidity_pct}% RH` : '—'}</span>
         <Divider />
         <span>PM2.5 {latest?.pm25 ?? '—'}</span>
         <Divider />
-        <span>{latest?.rain_in === 0 || latest?.rain_in == null ? 'No rain' : `${latest.rain_in}in rain`}</span>
+        <span>{latest?.rain_in === 0 || latest?.rain_in == null ? 'No rain' : `${formatRain(latest.rain_in, system)}${rainUnit(system)} rain`}</span>
         <Divider />
         <span className={`status-${freshness.stale ? 'watch' : 'ok'}`} style={{ fontSize: 11 }}>
           {freshness.label}

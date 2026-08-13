@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Card } from '../components/Card';
 import { trees } from '../data/mockData';
+import { useUnits, type UnitSystem } from '../contexts/UnitsContext';
+import { formatTemp, tempUnit } from '../lib/units';
 
 type ThresholdStrategy = 'groveiq' | 'species' | 'custom';
 
 export function Settings() {
   const [strategy, setStrategy] = useState<ThresholdStrategy>('groveiq');
+  const { system, setSystem } = useUnits();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 900 }}>
@@ -30,8 +33,44 @@ export function Settings() {
         <div className="eyebrow" style={{ marginBottom: 12 }}>
           Units & locale
         </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ color: 'var(--ink-soft)', fontSize: 12, marginBottom: 8 }}>Units</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(
+              [
+                { key: 'us', label: 'US customary', hint: '°F · mph · in · inHg' },
+                { key: 'metric', label: 'Metric', hint: '°C · km/h · mm · hPa' },
+              ] as { key: UnitSystem; label: string; hint: string }[]
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setSystem(opt.key)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: 2,
+                  padding: '8px 14px',
+                  borderRadius: 10,
+                  border: `1px solid ${system === opt.key ? 'var(--ink)' : 'var(--border)'}`,
+                  background: system === opt.key ? 'var(--ink)' : 'var(--surface)',
+                  color: system === opt.key ? 'var(--canvas)' : 'var(--ink)',
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ fontSize: 13.5, fontWeight: 500 }}>{opt.label}</span>
+                <span className="mono" style={{ fontSize: 11, opacity: 0.75 }}>
+                  {opt.hint}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 8 }}>
+            Applies across the whole app immediately and is remembered for next time. VPD, PM2.5, and EC keep their
+            standard scientific units regardless of this setting.
+          </p>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13.5 }}>
-          <Field label="Temperature" value="Celsius (no unit toggle yet)" />
           <Field label="Timezone" value="America/Los_Angeles" />
         </div>
       </Card>
@@ -113,7 +152,7 @@ export function Settings() {
                 <th style={{ padding: '6px 8px', fontWeight: 500 }}>Moisture low</th>
                 <th style={{ padding: '6px 8px', fontWeight: 500 }}>Moisture high</th>
                 <th style={{ padding: '6px 8px', fontWeight: 500 }}>EC high</th>
-                <th style={{ padding: '6px 8px', fontWeight: 500 }}>Dormancy soil temp</th>
+                <th style={{ padding: '6px 8px', fontWeight: 500 }}>Dormancy soil temp ({tempUnit(system)})</th>
               </tr>
             </thead>
             <tbody>
@@ -130,7 +169,7 @@ export function Settings() {
                     {tree.ecThresholdHigh}
                   </td>
                   <td className="mono" style={{ padding: '8px' }}>
-                    {tree.dormancySoilTempC}°C
+                    {formatTemp(tree.dormancySoilTempC, system)}°
                   </td>
                 </tr>
               ))}

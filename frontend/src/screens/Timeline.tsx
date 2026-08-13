@@ -2,10 +2,13 @@ import { useMemo, useState } from 'react';
 import { Card } from '../components/Card';
 import { MetricValue } from '../components/MetricValue';
 import { trees, dailyReadingsFor, milestonesFor } from '../data/mockData';
+import { useUnits } from '../contexts/UnitsContext';
+import { formatTemp, tempUnit } from '../lib/units';
 
 const RANGE_DAYS = 90;
 
 export function Timeline() {
+  const { system } = useUnits();
   const [treeId, setTreeId] = useState(trees[0].id);
   const readings = useMemo(() => dailyReadingsFor(treeId, RANGE_DAYS), [treeId]);
   const milestones = useMemo(() => milestonesFor(treeId), [treeId]);
@@ -107,7 +110,7 @@ export function Timeline() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
           <MetricValue label="Date" value={reading.date} />
           <MetricValue label="Soil moisture" value={reading.soilMoistureAvg} unit="%" />
-          <MetricValue label="Soil temp" value={reading.soilTempAvg} unit="°C" />
+          <MetricValue label="Soil temp" value={formatTemp(reading.soilTempAvg, system)} unit={tempUnit(system)} />
           <MetricValue label="EC" value={reading.soilEcAvg} />
         </div>
       </Card>
