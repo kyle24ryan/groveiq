@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS regional_air_quality (
   airnow_aqi REAL,
   airnow_category TEXT,
   reporting_area TEXT,
+  discussion TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_regional_air_quality_ts ON regional_air_quality(ts);
@@ -380,17 +381,6 @@ CREATE TABLE IF NOT EXISTS alerts (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_active ON alerts(alert_type, resolved_at);
-
--- AirNow regional AQI, key-gated (migration 0008)
-CREATE TABLE IF NOT EXISTS regional_air_quality (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts TEXT NOT NULL DEFAULT (datetime('now')),
-  airnow_aqi REAL,
-  airnow_category TEXT,
-  reporting_area TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_regional_air_quality_ts ON regional_air_quality(ts);
 
 -- SMS/MMS consent + compliance data model (migration 0009). See
 -- GROVEIQ_TWILIO_SMS_REQUIREMENTS.md section 10 for the full rationale.

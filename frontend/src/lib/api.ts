@@ -131,6 +131,7 @@ export type RegionalAqi = {
   airnow_aqi: number | null;
   airnow_category: string | null;
   reporting_area: string | null;
+  discussion: string | null;
 };
 
 export async function fetchRegionalAqi(): Promise<RegionalAqi | null> {

@@ -31,10 +31,11 @@ type RegionalAqiRow = {
   airnow_aqi: number | null;
   airnow_category: string | null;
   reporting_area: string | null;
+  discussion: string | null;
 };
 
 async function handleRegionalAqi(env: Env, headers: HeadersInit): Promise<Response> {
-  const row = await env.DB.prepare(`SELECT ts, airnow_aqi, airnow_category, reporting_area FROM regional_air_quality ORDER BY ts DESC LIMIT 1`).first<RegionalAqiRow>();
+  const row = await env.DB.prepare(`SELECT ts, airnow_aqi, airnow_category, reporting_area, discussion FROM regional_air_quality ORDER BY ts DESC LIMIT 1`).first<RegionalAqiRow>();
   return Response.json({ observation: row ?? null }, { headers });
 }
 
