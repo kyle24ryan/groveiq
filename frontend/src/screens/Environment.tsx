@@ -5,6 +5,7 @@ import { MetricValue } from '../components/MetricValue';
 import { StatusBadge } from '../components/StatusBadge';
 import { InfoTooltip } from '../components/InfoTooltip';
 import { AlertBanner } from '../components/AlertBanner';
+import { RegionalMaps } from '../components/RegionalMaps';
 import { metricInfo } from '../data/metricInfo';
 import { trees, vpdKPa, waterDemandNow, insightFor } from '../data/mockData';
 import {
@@ -356,6 +357,13 @@ export function Environment() {
               </div>
             </Card>
           )}
+
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>
+              Regional maps
+            </div>
+            <RegionalMaps />
+          </div>
 
           <Card style={{ borderColor: 'var(--insight)' }}>
             <div className="eyebrow" style={{ marginBottom: 6, color: 'var(--insight)' }}>
