@@ -1,6 +1,10 @@
 {
+  "scripts": {
+    "test": "vitest run"
+  },
   "devDependencies": {
     "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
     "wrangler": "^4.120.1"
   },
   "allowScripts": {

@@ -134,12 +134,44 @@ upfront. Status:
     interactive elements are real `<a>`/`<button>`), and confirmed the
     existing global `prefers-reduced-motion` CSS rule covers the new
     sidebar-drawer transition.
-  - **Not done**: full WCAG contrast audit of the existing palette (a
-    pre-existing, app-wide condition — e.g. `--watch` orange text at small
-    sizes is borderline AA — out of scope to redesign the base palette
-    here), and full per-screen responsive reflow at 360px (matrix-to-cards
-    conversion, Environment's grids) beyond what Phase 4's mobile nav
-    already covers.
+  - **Update 2026-08-14**: both "not done" items above are now done, on
+    explicit user request (not unprompted this time). WCAG audit computed
+    actual contrast ratios (not eyeballed) and found `--ink-faint`/
+    `--neutral` genuinely failing (2.4:1 in light mode, below even the
+    loosest 3:1 threshold) — fixed in `theme.css`. Full responsive reflow:
+    every fixed-column inline grid (17 instances, 8 files) now uses shared
+    `.rgrid-2/3/4/sidebar` classes with real breakpoints, verified in
+    browser at 402x874 (iPhone 16/17 Pro-class — exact 17 Pro viewport
+    unconfirmed), 850px, and 1100px, both color schemes.
+
+## Test suite (2026-08-14)
+
+No test framework existed in this repo; added Vitest to both `frontend/`
+and the repo root (backend), on explicit user request. Scoped to genuinely
+pure, deterministic functions rather than attempting full component or
+Workers-binding (D1/KV) integration tests in one pass:
+
+- `frontend/src/data/mockData.test.ts` — priority ranking, threshold
+  crossing, typical-swing gating, confidence derivation, status
+  consistency across `analyzeTree`/`insightFor`/`allInsights`, deterministic
+  seeding (spec 17's unit-test list, the parts expressible without a DOM).
+- `frontend/src/lib/api.test.ts` — `freshnessLabel`'s live/stale
+  classification and the 15-minute threshold boundary.
+- `src/sms/crypto.test.ts` — phone encryption round-trip, hash
+  determinism, E.164 normalization, redaction. Security-sensitive code
+  that had no coverage before.
+- `src/suncalc.test.ts` — sunrise-before-sunset/day-length invariants,
+  seasonal sanity check, and a tolerance-based regression check against
+  the astral-verified reference already documented in `suncalc.ts`'s own
+  comment (not an exact-string pin, since the algorithm's output shifts by
+  the input timestamp's time-of-day, not just the date).
+
+Run with `npm test` in `frontend/` or the repo root. **Not done**: React
+component/DOM tests (would need `@testing-library/react` + jsdom, a
+bigger addition than fit this pass), and Workers-binding integration
+tests for D1-touching code (`alerts.ts`'s D1 writes, route handlers) —
+those need `@cloudflare/vitest-pool-workers` wired to `wrangler.toml`,
+left as a follow-up if deeper coverage is wanted later.
 
 **Known limitation carried from the old Grove.tsx**: tree readings are
 still `mockData.ts`'s deterministic demo data, labeled as such in the
