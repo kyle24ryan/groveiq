@@ -7,7 +7,7 @@ export function Insights() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 800 }}>
       <div>
-        <h1 style={{ fontSize: 24 }}>Insights</h1>
+        <h1 style={{ fontSize: 24 }}>Intelligence</h1>
         <p style={{ color: 'var(--ink-soft)', marginTop: 4, fontSize: 14 }}>
           Anomalies, forecasts, and explanations across the collection.
         </p>

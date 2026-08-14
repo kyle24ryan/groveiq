@@ -30,9 +30,18 @@ upfront. Status:
 - [ ] Phase 3 — native spatial evidence panel. **Blocked on a map library
   decision** (MapLibre vs. staying Windy/PurpleAir-only) — ask before
   building. Deferred rather than shipping a placeholder.
-- [ ] Phase 4 — nav label rename (Grove→Overview, Insights→Intelligence),
-  Environment→Spatial route decision, responsive/mobile nav (sidebar is
-  currently a fixed 232px block with no mobile fallback).
+- [x] Phase 4 (partial) — nav labels renamed (Grove→Overview, Insights→
+  Intelligence; Insights.tsx's own heading updated to match). Sidebar is
+  now a responsive off-canvas drawer below 768px (hamburger top bar,
+  backdrop-click-to-close, 44px tap targets) via new `.groveiq-sidebar`/
+  `.groveiq-topbar`/`.groveiq-sidebar-backdrop` rules in theme.css;
+  unchanged (always-visible 232px) at tablet/desktop widths. **Not done**:
+  Environment→Spatial route/rename (deliberately deferred until Phase 3's
+  map lands — renaming it now would be premature since the page is still
+  weather-only), and full per-screen responsive layout (Environment's
+  grids, Overview's matrix-to-cards conversion at narrow widths, etc. —
+  content still just squeezes into mobile width rather than reflowing;
+  that's Phase 6's responsive QA pass).
 - [ ] Phase 5 — fold Insights screen into "Intelligence", same-species
   comparison workflow (Priority panel currently just links to the sibling
   tree's detail page, not a real side-by-side view).
