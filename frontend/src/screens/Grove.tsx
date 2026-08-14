@@ -29,7 +29,7 @@ export function Grove() {
       {needsAttention > 0 && priorityTree && (
         <div className="rgrid-sidebar" style={{ gap: 16, alignItems: 'start' }}>
           <PriorityIntelligencePanel insight={priorityInsight} tree={priorityTree} sibling={sibling} />
-          <SpatialEvidencePanel insight={priorityInsight} tree={priorityTree} latest={latest} freshnessLabel={freshness.label} />
+          <SpatialEvidencePanel insight={priorityInsight} tree={priorityTree} latest={latest} regionalAqi={regionalAqi} forecast={forecast} freshnessLabel={freshness.label} />
         </div>
       )}
 

@@ -204,9 +204,20 @@ header ("Tree readings: demo data"). Live conditions (temp/AQI/forecast)
 now feed the condition strip and next-risk panel; per-tree sensor data
 still isn't wired to D1/real hardware (soil probes not installed yet).
 
-Backlog: a more native-feeling regional map with real weather layers (wind,
-precip, AQI/smoke) instead of the current Windy/PurpleAir iframe embeds —
-overlaps with Phase 3/spec section 7.3's layer model.
+- [x] Multi-layer weather map (2026-08-14) — `SpatialEvidencePanel`'s map
+  now has 4 real, switchable layers (spec 7.3 naming): **Grove impact**
+  (default, unchanged), **Wind exposure** (always-on wind vector + a
+  colored ring sized by speed severity), **Air & smoke** (colored ring
+  from the grove's own local AQI reading — deliberately a point marker,
+  not an invented regional contour, since there's no gridded smoke
+  dataset here), and **Precipitation** (a genuine gridded overlay: RainViewer's
+  public, keyless radar tile API, verified working via a real tile fetch
+  before wiring it in). Switching layers updates the map overlay and the
+  summary rows together, per spec 7.3's "update all of the following
+  together" requirement. AQI categorization thresholds extracted from
+  Environment.tsx into `lib/aqi.ts` so the map and the Environment card
+  can't disagree. Windy/PurpleAir remain in Environment's secondary
+  "Regional source maps" section, unchanged.
 
 **Frontend deploys are manual.** The `groveiq` Cloudflare Pages project is
 not Git-connected (`wrangler pages project list` shows `Git Provider: No`)

@@ -9,6 +9,7 @@ import { RegionalMaps } from '../components/RegionalMaps';
 import { Collapsible } from '../components/Collapsible';
 import { MiniTrendChart, ChartToggle, useChartToggle } from '../components/MiniTrendChart';
 import { metricInfo } from '../data/metricInfo';
+import { aqiCategory } from '../lib/aqi';
 import { trees, vpdKPa, waterDemandNow, insightFor } from '../data/mockData';
 import {
   fetchLatestConditions,
@@ -29,16 +30,6 @@ import type { Status } from '../data/types';
 const compassPoints = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 function compassLabel(deg: number): string {
   return compassPoints[Math.round(deg / 22.5) % 16];
-}
-
-// Standard US EPA AQI categories, mapped to our ok/watch/urgent language.
-function aqiCategory(aqi: number): { label: string; status: Status } {
-  if (aqi <= 50) return { label: 'Good', status: 'ok' };
-  if (aqi <= 100) return { label: 'Moderate', status: 'watch' };
-  if (aqi <= 150) return { label: 'Unhealthy for sensitive groups', status: 'watch' };
-  if (aqi <= 200) return { label: 'Unhealthy', status: 'urgent' };
-  if (aqi <= 300) return { label: 'Very unhealthy', status: 'urgent' };
-  return { label: 'Hazardous', status: 'urgent' };
 }
 
 // Rough WBGT flag-system bands (Celsius), simplified to ok/watch/urgent —
