@@ -4,16 +4,29 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-13 (editable tree/profile UI landed — trees.ts/settings.ts routes + TreeDetail/Settings edit forms).
+Last updated: 2026-08-13 (Grove/Environment design pass — see below; deploy process note added).
+
+**Frontend deploys are manual.** The `groveiq` Cloudflare Pages project is
+not Git-connected (`wrangler pages project list` shows `Git Provider: No`)
+— pushing to GitHub does **not** deploy the frontend. After any frontend
+change: `cd frontend && npm run build && npx wrangler pages deploy dist
+--project-name=groveiq`. (The backend Worker deploys normally via `npx
+wrangler deploy` from the repo root.)
 
 ## UI/UX backlog (user feedback 2026-08-13)
 
 1. Push notifications — new delivery channel, no service worker/subscription
    flow exists yet
-2. Environment (and most screens) still reads as "journal-feeling" despite
-   the earlier Linear/Vercel-style redesign — needs another design pass
-3. Grove (home) feels elementary, especially the top metrics/status strip
-   — items 2 and 3 are the remaining "design pass" item, not yet started
+2. [x] Grove's top status strip redesigned as a bordered stat-cell grid
+   (was a flat mono dot-joined line); Environment's metric-card grid fixed
+   from an uneven 4+1 wrap to a full 3x2 grid (moved the Sun card into the
+   6th slot, removing the duplicate lower on the page); AQI card label
+   clarified to "Local AQI" to disambiguate from the regional AirNow line
+   below it. Broader "journal feeling" across other screens (Trees,
+   Timeline, Insights, Tree Detail) not yet addressed — scope was Grove +
+   Environment only per the original backlog item.
+3. Grove/Environment: done for the specific complaints raised (see #2) —
+   revisit if more screenshots surface further issues.
 4. [x] Trend graphs wherever data exists, collapsible via a graph-icon
    toggle per card — matches Ecowitt's dashboard pattern
 5. [x] Tree-specific fields (thresholds, notes, origin, age, stage, pot

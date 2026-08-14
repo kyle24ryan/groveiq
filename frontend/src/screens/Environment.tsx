@@ -154,7 +154,7 @@ export function Environment() {
 
       {!error && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             <Card>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                 <div className="eyebrow">Outdoor</div>
@@ -214,7 +214,7 @@ export function Environment() {
                   <ChartToggle open={aqiChart.open} onClick={aqiChart.toggle} />
                 </div>
               </div>
-              <MetricValue label="AQI" value={loading ? '—' : fmt(latest?.pm25_aqi ?? null, 0)} tooltip={metricInfo.aqi} />
+              <MetricValue label="Local AQI" value={loading ? '—' : fmt(latest?.pm25_aqi ?? null, 0)} tooltip={metricInfo.aqi} />
               <div style={{ marginTop: 10, fontSize: 13 }}>
                 {aqi ? aqi.label : '—'} · PM2.5 {loading ? '—' : fmt(latest?.pm25 ?? null, 0)} µg/m³
               </div>
@@ -249,6 +249,18 @@ export function Environment() {
               </div>
               {heatChart.open && <MiniTrendChart data={chartData} dataKey="blackGlobe" xKey="hour" color="var(--urgent)" unit={tempUnit(system)} />}
             </Card>
+
+            {sunTimes && (
+              <Card>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>
+                  Sun
+                </div>
+                <MetricValue label="Day length" value={sunTimes.dayLengthHours} unit="h" />
+                <div style={{ marginTop: 10, fontSize: 13 }}>
+                  Sunrise {sunTimes.sunrise} · Sunset {sunTimes.sunset}
+                </div>
+              </Card>
+            )}
           </div>
 
           <Card>
@@ -359,34 +371,6 @@ export function Environment() {
               </div>
             )}
           </Card>
-
-          {sunTimes && (
-            <Card>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>
-                Sun
-              </div>
-              <div style={{ display: 'flex', gap: 24, fontSize: 13 }}>
-                <div>
-                  <div style={{ color: 'var(--ink-soft)', fontSize: 12 }}>Sunrise</div>
-                  <div className="mono" style={{ fontSize: 16, marginTop: 2 }}>
-                    {sunTimes.sunrise}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'var(--ink-soft)', fontSize: 12 }}>Sunset</div>
-                  <div className="mono" style={{ fontSize: 16, marginTop: 2 }}>
-                    {sunTimes.sunset}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'var(--ink-soft)', fontSize: 12 }}>Day length</div>
-                  <div className="mono" style={{ fontSize: 16, marginTop: 2 }}>
-                    {sunTimes.dayLengthHours}h
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
 
           <div>
             <div className="eyebrow" style={{ marginBottom: 10 }}>
