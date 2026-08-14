@@ -9,6 +9,7 @@ import { handleTwilioWebhook } from './routes/twilioWebhook';
 import { handleTreesRoute } from './routes/trees';
 import { handleSettingsRoute } from './routes/settings';
 import { handlePushRoute } from './routes/push';
+import { handleCaptureRoute } from './routes/capture';
 import { fetchEcowittRealTime, writeConditionsReading } from './ecowitt';
 import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
 import { fetchNwsForecast, writeForecasts } from './nws';
@@ -50,6 +51,11 @@ export default {
 
     if (url.pathname.startsWith('/api/v1/push/')) {
       const response = await handlePushRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname.startsWith('/api/v1/capture/') || url.pathname.startsWith('/api/v1/trees/')) {
+      const response = await handleCaptureRoute(request, env, url.pathname);
       if (response) return response;
     }
 

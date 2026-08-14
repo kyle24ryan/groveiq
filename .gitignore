@@ -8,3 +8,7 @@ dist/
 firmware/**/include/secrets.h
 firmware/**/.pio/
 .cf-access-service-token
+scripts/camera-capture/config.json
+scripts/camera-capture/*.log
+scripts/camera-capture/*.err
+scripts/camera-capture/*.plist

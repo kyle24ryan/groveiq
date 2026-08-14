@@ -254,6 +254,21 @@ CREATE TABLE IF NOT EXISTS irrigation_events (
 );
 CREATE INDEX IF NOT EXISTS idx_irrigation_events_tree_ts ON irrigation_events(tree_id, ts);
 
+-- capture_requests: command-queue for on-demand camera capture, mirroring
+-- irrigation_events -- the Worker can't reach the camera/local script
+-- directly (no public IP on the home network), so the script polls this
+-- queue instead of being pushed to. See migrations/0013_capture_requests.sql.
+CREATE TABLE IF NOT EXISTS capture_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tree_id TEXT NOT NULL REFERENCES trees(id),
+  status TEXT NOT NULL CHECK (status IN ('pending','completed','failed')) DEFAULT 'pending',
+  requested_at TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at TEXT,
+  analysis_id INTEGER REFERENCES analyses(id),
+  error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_capture_requests_tree_requested ON capture_requests(tree_id, requested_at);
+
 -- ============================================================
 -- SEED DATA: species_reference (4 species — Grove Collection)
 -- ============================================================

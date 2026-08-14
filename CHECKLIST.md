@@ -327,10 +327,36 @@ until the probes show up.
       ever diagnose fake per-tree readings against real (shared) weather —
       confidently-wrong output, the same trust problem the earlier UI audit
       flagged. Waiting on Phase 1's soil sensors to do this honestly.
-- [ ] Reolink E1 Outdoor Pro install + preset positions, wire scheduled
-      capture into the vision pipeline — camera ordered, not installed; the
-      vision pipeline itself is built and camera-agnostic, so this is a
-      hardware-install task once the camera's mounted, not new code.
+- [ ] Reolink E1 Outdoor Pro physical install + preset positions — camera
+      ordered, not installed. Everything on the *code* side of this is now
+      built (2026-08-14), waiting on the hardware:
+      - `src/routes/capture.ts` + `capture_requests` table
+        (`migrations/0013_capture_requests.sql`): a full command-queue
+        endpoint pair mirroring `irrigation.ts`'s `/command`/`/confirm`
+        pattern, since the Worker can't reach the camera or a local
+        script directly (no public IP on the home network, same
+        constraint as the ESP32). `ingestTreePhoto()` extracted out of
+        `photos.ts` so manual browser-upload and camera-sourced photos
+        share one vision-analysis path, tagged `source: 'manual'` vs.
+        `'scheduled'` (the schema already had this column, unused until
+        now).
+      - `scripts/camera-capture/` — a Node script against Reolink's
+        documented local HTTP CGI API, **never run against a real
+        camera** since none is installed yet. Three modes: one-shot
+        specific-tree capture, `--all --auto` for a daily launchd job,
+        and `--watch` (long-running, services the app's new "Capture
+        now" button in Tree Detail by polling the request queue).
+      - **Not verified live**: the device-facing endpoints
+        (`/api/v1/capture/command` etc.) currently return the Cloudflare
+        Access login redirect (302) rather than reaching the Worker's own
+        auth check — confirmed by curl. They need an Access "Bypass"
+        policy added (same as `/privacy`/`/terms`/the Twilio webhook),
+        which is a Zero Trust dashboard change only the user can do — see
+        `scripts/camera-capture/README.md` step 4. **This same gap likely
+        applies to the irrigation ESP32's endpoints too** — worth
+        checking before that firmware ever gets flashed, since it would
+        hit the identical problem.
+      - `CAMERA_DEVICE_KEY` Worker secret generated and set.
 - [x] Email alert delivery (Resend) — live, watch+urgent tiers
 - [x] SMS consent/verification flow — confirmed working end-to-end live:
       phone entered, disclosure shown, OTP texted and verified, consent

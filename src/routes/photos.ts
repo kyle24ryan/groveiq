@@ -15,22 +15,30 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-async function handleUpload(request: Request, env: Env, treeId: string, headers: HeadersInit): Promise<Response> {
-  const contentType = request.headers.get('content-type') || '';
-  if (!ALLOWED_MEDIA_TYPES.has(contentType)) {
-    return Response.json({ error: `unsupported content-type: ${contentType} (expected image/jpeg, image/png, or image/webp)` }, { status: 400, headers });
-  }
+export type PhotoSource = 'manual' | 'scheduled';
 
-  const bytes = await request.arrayBuffer();
+type IngestResult =
+  | { ok: true; analysisId: number; photoKey: string; status: string; summary: string | null; detail: string | null }
+  | { ok: false; status: number; error: string; photoKey?: string };
+
+// Shared by both photo-ingestion paths: the browser upload in this file
+// (Access-gated, always source='manual') and the camera capture route
+// (device-key gated, source is whichever the caller passed). Keeping one
+// function means the R2 write, vision-analysis call, and analyses insert
+// can't drift between the two entry points.
+export async function ingestTreePhoto(env: Env, treeId: string, bytes: ArrayBuffer, contentType: string, source: PhotoSource): Promise<IngestResult> {
+  if (!ALLOWED_MEDIA_TYPES.has(contentType)) {
+    return { ok: false, status: 400, error: `unsupported content-type: ${contentType} (expected image/jpeg, image/png, or image/webp)` };
+  }
   if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) {
-    return Response.json({ error: 'image empty or too large (max 8MB)' }, { status: 400, headers });
+    return { ok: false, status: 400, error: 'image empty or too large (max 8MB)' };
   }
 
   const tree = await env.DB.prepare('SELECT id, name, species FROM trees WHERE id = ?')
     .bind(treeId)
     .first<{ id: string; name: string; species: string }>();
   if (!tree) {
-    return Response.json({ error: `unknown tree_id ${treeId}` }, { status: 404, headers });
+    return { ok: false, status: 404, error: `unknown tree_id ${treeId}` };
   }
 
   const speciesRow = await env.DB.prepare('SELECT ai_notes FROM species_reference WHERE species = ?')
@@ -52,24 +60,36 @@ async function handleUpload(request: Request, env: Env, treeId: string, headers:
     });
   } catch (err) {
     // The photo is already saved even if analysis fails - don't lose the upload.
-    return Response.json({ error: `vision analysis failed: ${String(err)}`, photo_r2_key: key }, { status: 502, headers });
+    return { ok: false, status: 502, error: `vision analysis failed: ${String(err)}`, photoKey: key };
   }
 
   const result = await env.DB.prepare(
     `INSERT INTO analyses (tree_id, kind, source, status, summary, detail, model, photo_r2_key)
-     VALUES (?, 'vision', 'manual', ?, ?, ?, ?, ?)`
+     VALUES (?, 'vision', ?, ?, ?, ?, ?, ?)`
   )
-    .bind(treeId, analysis.status, analysis.summary, analysis.detail, 'claude-sonnet-5', key)
+    .bind(treeId, source, analysis.status, analysis.summary, analysis.detail, 'claude-sonnet-5', key)
     .run();
+
+  return { ok: true, analysisId: Number(result.meta.last_row_id), photoKey: key, status: analysis.status, summary: analysis.summary, detail: analysis.detail };
+}
+
+async function handleUpload(request: Request, env: Env, treeId: string, headers: HeadersInit): Promise<Response> {
+  const contentType = request.headers.get('content-type') || '';
+  const bytes = await request.arrayBuffer();
+  const result = await ingestTreePhoto(env, treeId, bytes, contentType, 'manual');
+
+  if (!result.ok) {
+    return Response.json({ error: result.error, photo_r2_key: result.photoKey }, { status: result.status, headers });
+  }
 
   return Response.json(
     {
-      analysis_id: result.meta.last_row_id,
-      photo_r2_key: key,
-      photo_url: `/api/v1/photos/${encodeURIComponent(key)}`,
-      status: analysis.status,
-      summary: analysis.summary,
-      detail: analysis.detail,
+      analysis_id: result.analysisId,
+      photo_r2_key: result.photoKey,
+      photo_url: `/api/v1/photos/${encodeURIComponent(result.photoKey)}`,
+      status: result.status,
+      summary: result.summary,
+      detail: result.detail,
     },
     { headers }
   );

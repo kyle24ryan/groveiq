@@ -10,7 +10,21 @@ import { metricInfo } from '../data/metricInfo';
 import { trees, speciesReference, dailyReadingsFor, insightFor, milestonesFor, lastWateredFor } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, formatTemp, tempUnit } from '../lib/units';
-import { fetchTreeAnalyses, uploadTreePhoto, photoUrl, fetchTreeProfile, updateTreeProfile, type PhotoAnalysis, type TreeProfile, type TreeProfileEditableFields } from '../lib/api';
+import {
+  fetchTreeAnalyses,
+  uploadTreePhoto,
+  photoUrl,
+  fetchTreeProfile,
+  updateTreeProfile,
+  requestCapture,
+  fetchLatestCaptureRequest,
+  type PhotoAnalysis,
+  type TreeProfile,
+  type TreeProfileEditableFields,
+} from '../lib/api';
+
+const CAPTURE_POLL_MS = 5000;
+const CAPTURE_TIMEOUT_MS = 3 * 60 * 1000; // camera + script + vision analysis shouldn't take longer than this
 
 export function TreeDetail() {
   const { system } = useUnits();
@@ -21,6 +35,10 @@ export function TreeDetail() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [captureStatus, setCaptureStatus] = useState<'idle' | 'pending' | 'error'>('idle');
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const capturePollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [profile, setProfile] = useState<TreeProfile | null>(null);
   const [editing, setEditing] = useState(false);
@@ -102,6 +120,58 @@ export function TreeDetail() {
       setUploading(false);
     }
   }
+
+  // "Capture now" doesn't reach the camera directly -- it queues a
+  // request the local capture script picks up on its own poll cycle (see
+  // scripts/camera-capture/README.md), so this just polls the Worker back
+  // for that request's status until the script finishes it or the client
+  // gives up waiting.
+  async function handleCaptureNow() {
+    if (!treeId) return;
+    setCaptureStatus('pending');
+    setCaptureError(null);
+    try {
+      await requestCapture(treeId);
+    } catch {
+      setCaptureStatus('error');
+      setCaptureError("Couldn't reach GroveIQ to request a capture.");
+      return;
+    }
+
+    const deadline = Date.now() + CAPTURE_TIMEOUT_MS;
+    const poll = async () => {
+      try {
+        const req = await fetchLatestCaptureRequest(treeId);
+        if (req?.status === 'completed') {
+          setCaptureStatus('idle');
+          const analyses = await fetchTreeAnalyses(treeId);
+          setPhotoAnalyses(analyses.filter((a) => a.kind === 'vision'));
+          return;
+        }
+        if (req?.status === 'failed') {
+          setCaptureStatus('error');
+          setCaptureError(req.error ?? 'Capture failed.');
+          return;
+        }
+      } catch {
+        // Transient fetch failure -- keep polling until the deadline rather
+        // than giving up on one bad request.
+      }
+      if (Date.now() > deadline) {
+        setCaptureStatus('error');
+        setCaptureError('No response from the camera script — is it running?');
+        return;
+      }
+      capturePollRef.current = setTimeout(poll, CAPTURE_POLL_MS);
+    };
+    capturePollRef.current = setTimeout(poll, CAPTURE_POLL_MS);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (capturePollRef.current) clearTimeout(capturePollRef.current);
+    };
+  }, []);
 
   if (!tree) {
     return (
@@ -291,7 +361,25 @@ export function TreeDetail() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div className="eyebrow">Imagery</div>
-          <div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={handleCaptureNow}
+              disabled={captureStatus === 'pending'}
+              title="Requests a photo from the grove camera — needs the local capture script running"
+              style={{
+                fontSize: 12.5,
+                padding: '5px 12px',
+                borderRadius: 999,
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--ink)',
+                cursor: captureStatus === 'pending' ? 'default' : 'pointer',
+                opacity: captureStatus === 'pending' ? 0.6 : 1,
+              }}
+            >
+              {captureStatus === 'pending' ? 'Waiting for camera…' : 'Capture now'}
+            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -368,6 +456,9 @@ export function TreeDetail() {
 
           {uploadError && (
             <p style={{ fontSize: 12, color: 'var(--urgent)', marginTop: 10 }}>Upload failed: {uploadError}</p>
+          )}
+          {captureStatus === 'error' && captureError && (
+            <p style={{ fontSize: 12, color: 'var(--urgent)', marginTop: 10 }}>Capture failed: {captureError}</p>
           )}
 
           {photoAnalyses[0] && (

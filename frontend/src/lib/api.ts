@@ -85,6 +85,35 @@ export function photoUrl(relativePath: string): string {
   return `${API_ORIGIN}${relativePath}`;
 }
 
+// --- Camera capture-request queue (spec: "Capture now" button) ---
+// The Worker can't reach the camera or the local capture script directly
+// (no public IP on the home network), so this just queues a request; a
+// script polling in the background picks it up. See
+// scripts/camera-capture/README.md for the other half of this flow.
+
+export type CaptureRequest = {
+  id: string;
+  status: 'pending' | 'completed' | 'failed';
+  requested_at: string;
+  completed_at: string | null;
+  analysis_id: number | null;
+  error: string | null;
+};
+
+export async function requestCapture(treeId: string): Promise<{ requestId: string; alreadyPending: boolean }> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/capture-request`, { method: 'POST' });
+  const body = (await res.json()) as { ok: boolean; request_id?: string; already_pending?: boolean; error?: string };
+  if (!res.ok || !body.ok || !body.request_id) throw new Error(body.error || `capture request failed: ${res.status}`);
+  return { requestId: body.request_id, alreadyPending: !!body.already_pending };
+}
+
+export async function fetchLatestCaptureRequest(treeId: string): Promise<CaptureRequest | null> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/capture-request/latest`);
+  if (!res.ok) throw new Error(`capture request status failed: ${res.status}`);
+  const body = (await res.json()) as { request: CaptureRequest | null };
+  return body.request;
+}
+
 export type ActiveAlert = {
   id: number;
   alert_type: 'wind' | 'heat' | 'aqi' | string;

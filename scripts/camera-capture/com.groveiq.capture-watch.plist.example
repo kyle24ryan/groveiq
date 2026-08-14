@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.groveiq.capture-watch</string>
+
+    <!-- Run `which node` and replace both paths below with your real ones. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/REPLACE/WITH/ABSOLUTE/PATH/TO/GroveIQ/scripts/camera-capture/capture.mjs</string>
+        <string>--watch</string>
+    </array>
+
+    <!-- This is what serves the app's "Capture now" button -- it needs to
+         actually be running for that to do anything. RunAtLoad starts it
+         when you log in; KeepAlive restarts it if it ever crashes. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/REPLACE/WITH/ABSOLUTE/PATH/TO/GroveIQ/scripts/camera-capture/capture-watch.log</string>
+    <key>StandardErrorPath</key>
+    <string>/REPLACE/WITH/ABSOLUTE/PATH/TO/GroveIQ/scripts/camera-capture/capture-watch.err</string>
+</dict>
+</plist>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.groveiq.capture-daily</string>
+
+    <!-- Run `which node` and replace both paths below with your real ones. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/REPLACE/WITH/ABSOLUTE/PATH/TO/GroveIQ/scripts/camera-capture/capture.mjs</string>
+        <string>--all</string>
+        <string>--auto</string>
+    </array>
+
+    <!-- Once daily at 10:00 AM local time. Edit Hour/Minute to change it. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/REPLACE/WITH/ABSOLUTE/PATH/TO/GroveIQ/scripts/camera-capture/capture-daily.log</string>
+    <key>StandardErrorPath</key>
+    <string>/REPLACE/WITH/ABSOLUTE/PATH/TO/GroveIQ/scripts/camera-capture/capture-daily.err</string>
+</dict>
+</plist>
