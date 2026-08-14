@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { Grove } from './screens/Grove';
 import { Trees } from './screens/Trees';
 import { TreeDetail } from './screens/TreeDetail';
+import { TreeCompare } from './screens/TreeCompare';
 import { Environment } from './screens/Environment';
 import { Timeline } from './screens/Timeline';
 import { Insights } from './screens/Insights';
@@ -19,6 +20,7 @@ function App() {
           <Route element={<Layout />}>
             <Route index element={<Grove />} />
             <Route path="trees" element={<Trees />} />
+            <Route path="trees/compare/:idA/:idB" element={<TreeCompare />} />
             <Route path="trees/:treeId" element={<TreeDetail />} />
             <Route path="species" element={<SpeciesReference />} />
             <Route path="species/:species" element={<SpeciesReference />} />

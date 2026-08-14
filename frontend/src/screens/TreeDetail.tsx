@@ -117,6 +117,7 @@ export function TreeDetail() {
   const milestones = milestonesFor(tree.id);
   const latest = readings[readings.length - 1];
   const species = speciesReference.find((s) => s.species === tree.species);
+  const sibling = trees.find((t) => t.species === tree.species && t.id !== tree.id);
   const lastWatered = lastWateredFor(tree.id);
 
   // Editable fields prefer the live D1 profile once it loads; fall back to
@@ -274,9 +275,16 @@ export function TreeDetail() {
             How this applies to {tree.name}
           </div>
           <p style={{ fontSize: 13.5, lineHeight: 1.5 }}>{species.aiNotes}</p>
-          <Link to={`/species/${encodeURIComponent(tree.species)}`} style={{ fontSize: 12.5, color: 'var(--insight)' }}>
-            Full species profile →
-          </Link>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <Link to={`/species/${encodeURIComponent(tree.species)}`} style={{ fontSize: 12.5, color: 'var(--insight)' }}>
+              Full species profile →
+            </Link>
+            {sibling && (
+              <Link to={`/trees/compare/${tree.id}/${sibling.id}`} style={{ fontSize: 12.5, color: 'var(--insight)' }}>
+                Compare with {sibling.name} →
+              </Link>
+            )}
+          </div>
         </Card>
       )}
 

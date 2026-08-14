@@ -15,14 +15,24 @@ const confidenceLabel: Record<NonNullable<Insight['confidence']>['level'], strin
 // conclusion never rests on prose alone. Only renders real actions —
 // "Compare with X" is omitted entirely when no same-species sibling
 // exists, rather than showing a control with nothing behind it.
-export function PriorityIntelligencePanel({ insight, tree, sibling }: { insight: Insight; tree: Tree; sibling?: Tree }) {
+export function PriorityIntelligencePanel({
+  insight,
+  tree,
+  sibling,
+  eyebrowLabel = 'Priority signal',
+}: {
+  insight: Insight;
+  tree: Tree;
+  sibling?: Tree;
+  eyebrowLabel?: string;
+}) {
   const timeAgo = Math.round((Date.now() - new Date(insight.ts).getTime()) / 60000);
 
   return (
     <Card style={{ borderColor: 'var(--insight)', borderWidth: 1.5, padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <span className="eyebrow" style={{ color: 'var(--insight)' }}>
-          Priority signal
+          {eyebrowLabel}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {insight.confidence && (
@@ -75,8 +85,8 @@ export function PriorityIntelligencePanel({ insight, tree, sibling }: { insight:
           Review evidence →
         </Link>
         {sibling && (
-          <Link to={`/trees/${sibling.id}`} style={{ fontSize: 13, color: 'var(--insight)', fontWeight: 500 }}>
-            View {sibling.name} →
+          <Link to={`/trees/compare/${tree.id}/${sibling.id}`} style={{ fontSize: 13, color: 'var(--insight)', fontWeight: 500 }}>
+            Compare with {sibling.name} →
           </Link>
         )}
       </div>

@@ -42,9 +42,17 @@ upfront. Status:
   grids, Overview's matrix-to-cards conversion at narrow widths, etc. —
   content still just squeezes into mobile width rather than reflowing;
   that's Phase 6's responsive QA pass).
-- [ ] Phase 5 — fold Insights screen into "Intelligence", same-species
-  comparison workflow (Priority panel currently just links to the sibling
-  tree's detail page, not a real side-by-side view).
+- [x] Phase 5 — Insights.tsx rebuilt as the "Intelligence" surface: active
+  (non-`ok`) trees each get the same dense `PriorityIntelligencePanel`
+  Overview uses (now takes an `eyebrowLabel` prop so a list of them doesn't
+  all say "Priority signal"), stable trees collapse to one low-emphasis row
+  each. Real same-species comparison workflow shipped: new
+  `/trees/compare/:idA/:idB` route (`TreeCompare.tsx`) with side-by-side
+  metric cards, an overlaid 14-day moisture chart, and shared species
+  context — wired from both the Priority panel's "Compare with X" link and
+  a new link on Tree Detail's species card. Analysis model was already
+  shared everywhere (`analyzeTree`/`insightFor` used by sidebar, Overview,
+  Tree Detail, TreeCard, Intelligence, Timeline) — no changes needed there.
 - [ ] Phase 6 — accessibility/dark-mode/responsive QA pass, since no formal
   test suite exists in this repo (not introduced without asking — flagging
   before adding a testing framework).
