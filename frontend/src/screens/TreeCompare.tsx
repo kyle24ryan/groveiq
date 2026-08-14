@@ -77,7 +77,10 @@ export function TreeCompare() {
         <div className="eyebrow" style={{ marginBottom: 12 }}>
           Soil moisture — last 14 days
         </div>
-        <ResponsiveContainer width="100%" height={220}>
+        <span className="sr-only">
+          {`${treeA.name} soil moisture ranged from ${Math.min(...readingsA.map((r) => r.soilMoistureAvg))}% to ${Math.max(...readingsA.map((r) => r.soilMoistureAvg))}% over the last 14 days, currently ${a.latest.soilMoistureAvg}%. ${treeB.name} ranged from ${Math.min(...readingsB.map((r) => r.soilMoistureAvg))}% to ${Math.max(...readingsB.map((r) => r.soilMoistureAvg))}%, currently ${b.latest.soilMoistureAvg}%.`}
+        </span>
+        <ResponsiveContainer width="100%" height={220} aria-hidden="true">
           <LineChart data={merged}>
             <CartesianGrid stroke="var(--border)" vertical={false} />
             <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} tickFormatter={(d: string) => d.slice(5)} minTickGap={24} />

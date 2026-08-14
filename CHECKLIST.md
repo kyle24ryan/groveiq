@@ -53,9 +53,33 @@ upfront. Status:
   a new link on Tree Detail's species card. Analysis model was already
   shared everywhere (`analyzeTree`/`insightFor` used by sidebar, Overview,
   Tree Detail, TreeCard, Intelligence, Timeline) — no changes needed there.
-- [ ] Phase 6 — accessibility/dark-mode/responsive QA pass, since no formal
-  test suite exists in this repo (not introduced without asking — flagging
-  before adding a testing framework).
+- [x] Phase 6 (scoped) — no formal test suite exists in this repo and one
+  wasn't introduced (flagging rather than adding testing infra unprompted).
+  Did a manual pass instead, fixing what it found rather than just auditing:
+  - Layer-selector buttons (RegionalMaps tabs, Settings' unit/threshold
+    toggles) now expose `aria-pressed` (spec 12 explicit requirement — they
+    were real `<button>`s already, just missing the state attribute).
+  - New charts (`EvidenceProjectionChart`, `TreeCompare`'s overlay chart)
+    now carry an `.sr-only` text summary (spec 12: "every chart requires an
+    accessible summary") — new `.sr-only` utility added to theme.css.
+  - **Real bug found and fixed**: Environment.tsx's error state literally
+    rendered `TypeError: Failed to fetch` into the page (spec 13 names this
+    exact anti-pattern by example) — worse, the surrounding `{!error &&
+    (...)}` hid the *entire* rest of the page behind one failed fetch,
+    including RegionalMaps/forecast/Grove-impact sections that don't even
+    depend on it. Fixed: generic user-facing error text, and removed the
+    blanket conditional so independent sections keep working (most fields
+    already degrade to "—" via existing `latest?.field ?? null` fallbacks).
+  - Spot-verified light/dark mode, keyboard-reachable controls (all new
+    interactive elements are real `<a>`/`<button>`), and confirmed the
+    existing global `prefers-reduced-motion` CSS rule covers the new
+    sidebar-drawer transition.
+  - **Not done**: full WCAG contrast audit of the existing palette (a
+    pre-existing, app-wide condition — e.g. `--watch` orange text at small
+    sizes is borderline AA — out of scope to redesign the base palette
+    here), and full per-screen responsive reflow at 360px (matrix-to-cards
+    conversion, Environment's grids) beyond what Phase 4's mobile nav
+    already covers.
 
 **Known limitation carried from the old Grove.tsx**: tree readings are
 still `mockData.ts`'s deterministic demo data, labeled as such in the

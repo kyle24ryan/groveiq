@@ -147,13 +147,12 @@ export function Environment() {
       {error && (
         <Card style={{ borderColor: 'var(--urgent)' }}>
           <p style={{ fontSize: 13.5, color: 'var(--urgent)' }}>
-            Couldn't reach the live weather feed ({error}). Showing nothing rather than stale or fabricated numbers.
+            Couldn't reach the live weather feed right now. Showing whatever data is still available below rather than stale or fabricated numbers.
           </p>
         </Card>
       )}
 
-      {!error && (
-        <>
+      <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             <Card>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -391,7 +390,6 @@ export function Environment() {
             </p>
           </Card>
         </>
-      )}
     </div>
   );
 }

@@ -54,6 +54,7 @@ export function RegionalMaps() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
+            aria-pressed={tab === t.key}
             style={{
               padding: '6px 12px',
               borderRadius: '999px 999px 0 0',

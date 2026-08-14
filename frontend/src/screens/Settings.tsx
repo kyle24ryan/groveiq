@@ -61,6 +61,7 @@ export function Settings() {
               <button
                 key={opt.key}
                 onClick={() => setSystem(opt.key)}
+                aria-pressed={system === opt.key}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -158,6 +159,7 @@ export function Settings() {
             <button
               key={opt.key}
               onClick={() => setStrategy(opt.key)}
+              aria-pressed={strategy === opt.key}
               style={{
                 padding: '6px 12px',
                 borderRadius: 999,

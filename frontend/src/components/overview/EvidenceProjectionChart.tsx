@@ -16,10 +16,23 @@ type EvidenceProjectionChartProps = {
 // Per spec 6.2/10.3: never let the chart imply a forecast is an observation.
 export function EvidenceProjectionChart({ data, unit = '%', thresholdValue, thresholdLabel, color = 'var(--insight)' }: EvidenceProjectionChartProps) {
   const hasProjection = data.some((d) => d.projected !== undefined && d.observed === undefined);
+  const observedPoints = data.filter((d) => d.observed !== undefined);
+  const firstObserved = observedPoints[0];
+  const lastObserved = observedPoints[observedPoints.length - 1];
+  const lastProjected = data[data.length - 1];
+
+  const summary = [
+    firstObserved && lastObserved ? `Observed ${firstObserved.date} through ${lastObserved.date}: from ${firstObserved.observed}${unit} to ${lastObserved.observed}${unit}.` : null,
+    hasProjection && lastProjected ? `Projected to continue to about ${lastProjected.projected}${unit} by ${lastProjected.date} at the current rate.` : null,
+    thresholdValue != null ? `${thresholdLabel ?? 'Threshold'} is ${thresholdValue}${unit}.` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div>
-      <ResponsiveContainer width="100%" height={160}>
+      <span className="sr-only">{summary}</span>
+      <ResponsiveContainer width="100%" height={160} aria-hidden="true">
         <LineChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} tickFormatter={(d: string) => d.slice(5)} minTickGap={28} />
