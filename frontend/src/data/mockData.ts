@@ -1,4 +1,4 @@
-import type { Conditions, DailyReading, Insight, Milestone, SpeciesReference, Status, Tree } from './types';
+import type { ConfidenceLevel, Conditions, DailyReading, EvidencePoint, Insight, Milestone, SpeciesReference, Status, Tree } from './types';
 
 // Grove Collection — Kyle Ryan, North Bend, WA. Mirrors migrations/0001_real_trees_and_species.sql.
 export const trees: Tree[] = [
@@ -295,47 +295,103 @@ export function statusFor(treeId: string): Status {
   return analyzeTree(treeId).status;
 }
 
-const likelyCauses = [
-  'Higher temperatures and wind likely contributed.',
-  'Longer stretch between waterings than usual.',
-  'Rising EC suggests it may be due for a flush.',
+const likelyDrivers: { label: string; relationship: 'correlated' | 'likely'; description: string }[] = [
+  { label: 'Heat + wind', relationship: 'correlated', description: 'Higher temperatures and wind likely contributed.' },
+  { label: 'Watering interval', relationship: 'likely', description: 'Longer stretch between waterings than usual.' },
+  { label: 'Rising EC', relationship: 'likely', description: 'Rising EC suggests it may be due for a flush.' },
 ];
+
+// Deterministic confidence rule (spec 8.3): based on how large the observed
+// move is relative to this tree's own trailing-14-day typical swing. Not a
+// statistical model — just documents *why* a confidence label is shown at
+// all, rather than presenting one with no derivable basis.
+function deriveConfidence(a: TreeAnalysis): Insight['confidence'] | undefined {
+  if (a.status === 'ok') return undefined;
+  if (a.belowThreshold || a.aboveThreshold) {
+    return { level: 'high', rationale: "Directly measured against this tree's own threshold, not inferred." };
+  }
+  if (a.decliningFast) {
+    const ratio = a.typicalSwing > 0 ? Math.abs(a.changePct) / a.typicalSwing : Infinity;
+    const level: ConfidenceLevel = ratio >= 3 ? 'high' : ratio >= 1.5 ? 'medium' : 'low';
+    return {
+      level,
+      rationale: `Overnight change is ${Number.isFinite(ratio) ? `${ratio.toFixed(1)}x` : 'far beyond'} this tree's typical swing over its trailing 14-day baseline.`,
+    };
+  }
+  return undefined;
+}
+
+// Builds the chart series behind a decliningFast insight: the last 10 days
+// of real readings (observed), then a straight-line projection continuing
+// at the current rate of change (changePct) until it crosses the tree's
+// threshold or hits a 5-day cap, whichever comes first. The handoff date
+// carries both an `observed` and `projected` value so the two lines meet.
+function buildEvidenceSeries(a: TreeAnalysis): EvidencePoint[] {
+  const recent = dailyReadingsFor(a.tree.id, 10);
+  const points: EvidencePoint[] = recent.map((r) => ({ date: r.date, observed: r.soilMoistureAvg }));
+
+  if (a.decliningFast && a.changePct < 0) {
+    const projectionDays = Math.min(Math.ceil(a.daysToThreshold ?? 4), 5);
+    const lastDate = new Date(`${a.latest.date}T00:00:00`);
+    points[points.length - 1] = { ...points[points.length - 1], projected: a.latest.soilMoistureAvg };
+    for (let i = 1; i <= projectionDays; i++) {
+      const date = new Date(lastDate);
+      date.setDate(date.getDate() + i);
+      const value = Math.max(0, Math.round((a.latest.soilMoistureAvg + a.changePct * i) * 10) / 10);
+      points.push({ date: localDateStr(date), projected: value });
+    }
+  }
+
+  return points;
+}
 
 export function insightFor(treeId: string): Insight {
   const a = analyzeTree(treeId);
   const rand = seededRandom(seedFromString(treeId + 'insight'));
+  const driver = likelyDrivers[Math.floor(rand() * likelyDrivers.length)];
 
   let title: string;
+  let headline: string;
   let evidence: string;
   let comparison: string | undefined;
   let likelyCause: string | undefined;
   let implication: string | undefined;
   let action: string | undefined;
+  let thresholdValue: number | undefined;
+  let thresholdLabel: string | undefined;
 
   if (a.belowThreshold) {
     title = 'GroveIQ: soil moisture below threshold.';
+    headline = `${a.tree.name} is below its safe soil moisture threshold`;
     evidence = `Soil moisture at ${a.latest.soilMoistureAvg}%, below its ${a.tree.soilMoistureThresholdLow}% threshold.`;
-    likelyCause = likelyCauses[Math.floor(rand() * likelyCauses.length)];
+    likelyCause = driver.description;
     action = 'Water today and recheck this evening.';
+    thresholdValue = a.tree.soilMoistureThresholdLow;
+    thresholdLabel = 'Moisture threshold';
   } else if (a.decliningFast) {
+    const ratio = a.typicalSwing < 1 ? null : Math.min(Math.abs(a.changePct) / a.typicalSwing, 9);
     title = 'GroveIQ detected an abnormal drying rate.';
+    headline = ratio !== null ? `${a.tree.name} is drying ${ratio.toFixed(1)}x faster than its normal overnight rate` : `${a.tree.name} is drying faster than usual overnight`;
     evidence = `Soil moisture is currently within its preferred range at ${a.latest.soilMoistureAvg}%, but declined ${Math.abs(a.changePct)} percentage points overnight.`;
-    comparison =
-      a.typicalSwing < 1
-        ? 'a larger move than its usual overnight change'
-        : `about ${Math.min(Math.abs(a.changePct) / a.typicalSwing, 9).toFixed(1)}x its typical overnight change`;
-    likelyCause = likelyCauses[Math.floor(rand() * likelyCauses.length)];
+    comparison = ratio !== null ? `about ${ratio.toFixed(1)}x its typical overnight change` : 'a larger move than its usual overnight change';
+    likelyCause = driver.description;
     implication =
       a.daysToThreshold !== null
         ? `Projected to cross its threshold in about ${a.daysToThreshold} day${a.daysToThreshold === 1 ? '' : 's'} at this rate.`
         : undefined;
     action = a.status === 'urgent' ? 'Water today and recheck this evening.' : 'Recheck tomorrow and plan to water within 1-2 days.';
+    thresholdValue = a.tree.soilMoistureThresholdLow;
+    thresholdLabel = 'Moisture threshold';
   } else if (a.aboveThreshold) {
     title = 'GroveIQ: soil moisture above preferred range.';
+    headline = `${a.tree.name}'s soil moisture is above its preferred range`;
     evidence = `Soil moisture at ${a.latest.soilMoistureAvg}%, above its ${a.tree.soilMoistureThresholdHigh}% threshold.`;
     action = 'Hold off watering and check drainage.';
+    thresholdValue = a.tree.soilMoistureThresholdHigh;
+    thresholdLabel = 'Moisture threshold';
   } else {
     title = 'GroveIQ: conditions are stable.';
+    headline = `${a.tree.name} is stable`;
     evidence = `Soil moisture at ${a.latest.soilMoistureAvg}%, within its ${a.tree.soilMoistureThresholdLow}-${a.tree.soilMoistureThresholdHigh}% preferred range.`;
   }
 
@@ -344,12 +400,25 @@ export function insightFor(treeId: string): Insight {
     treeId,
     status: a.status,
     title,
+    headline,
     evidence,
     comparison,
     likelyCause,
     implication,
     action,
     ts: new Date().toISOString(),
+    detection: {
+      metric: 'Soil moisture',
+      currentValue: a.latest.soilMoistureAvg,
+      unit: '%',
+      changeWindow: 'overnight',
+    },
+    driver: a.status !== 'ok' ? { label: driver.label, relationship: driver.relationship } : undefined,
+    confidence: deriveConfidence(a),
+    daysToThreshold: a.daysToThreshold,
+    thresholdValue,
+    thresholdLabel,
+    evidenceSeries: a.status !== 'ok' ? buildEvidenceSeries(a) : undefined,
   };
 }
 

@@ -4,7 +4,51 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-13 (Grove/Environment design pass — see below; deploy process note added).
+Last updated: 2026-08-13 (Command + Spatial Intelligence redesign, Phase 1-2 of `docs/GROVEIQ_COMMAND_SPATIAL_REDESIGN_SPEC.md`).
+
+## Command + Spatial Intelligence redesign
+
+Full spec: `docs/GROVEIQ_COMMAND_SPATIAL_REDESIGN_SPEC.md`. User approved
+building the whole spec, phased, confirming scope at each phase rather than
+upfront. Status:
+
+- [x] Phase 1 — structured `Insight` data model: `detection`/`driver`/
+  `confidence`/`evidenceSeries`/`thresholdValue` fields added to `types.ts`,
+  populated in `mockData.ts`'s `insightFor()` (deterministic confidence rule
+  documented inline). Additive — existing prose fields (`evidence`,
+  `comparison`, etc.) unchanged, so TreeCard/Insights/Timeline needed no
+  changes.
+- [x] Phase 2 — Overview shell: `Grove.tsx` rebuilt around
+  `useGroveOverview()` (centralizes fetch + priority ranking so nothing can
+  disagree) composing `SituationalHeader`, `PriorityIntelligencePanel` +
+  `EvidenceProjectionChart` (observed solid / projected dashed / threshold
+  reference line), `GroveConditionStrip` (4 grouped tiles, not a flat metric
+  row), `CollectionStatusMatrix` (dense table replacing the old tree-card
+  grid on Overview only — Trees.tsx still uses TreeCard, unchanged), and
+  `NextRiskPanel`. Route stays `/`; nav label still reads "Grove" (rename is
+  Phase 4).
+- [ ] Phase 3 — native spatial evidence panel. **Blocked on a map library
+  decision** (MapLibre vs. staying Windy/PurpleAir-only) — ask before
+  building. Deferred rather than shipping a placeholder.
+- [ ] Phase 4 — nav label rename (Grove→Overview, Insights→Intelligence),
+  Environment→Spatial route decision, responsive/mobile nav (sidebar is
+  currently a fixed 232px block with no mobile fallback).
+- [ ] Phase 5 — fold Insights screen into "Intelligence", same-species
+  comparison workflow (Priority panel currently just links to the sibling
+  tree's detail page, not a real side-by-side view).
+- [ ] Phase 6 — accessibility/dark-mode/responsive QA pass, since no formal
+  test suite exists in this repo (not introduced without asking — flagging
+  before adding a testing framework).
+
+**Known limitation carried from the old Grove.tsx**: tree readings are
+still `mockData.ts`'s deterministic demo data, labeled as such in the
+header ("Tree readings: demo data"). Live conditions (temp/AQI/forecast)
+now feed the condition strip and next-risk panel; per-tree sensor data
+still isn't wired to D1/real hardware (soil probes not installed yet).
+
+Backlog: a more native-feeling regional map with real weather layers (wind,
+precip, AQI/smoke) instead of the current Windy/PurpleAir iframe embeds —
+overlaps with Phase 3/spec section 7.3's layer model.
 
 **Frontend deploys are manual.** The `groveiq` Cloudflare Pages project is
 not Git-connected (`wrangler pages project list` shows `Git Provider: No`)

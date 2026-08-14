@@ -82,6 +82,24 @@ export type Conditions = {
   pm25: number;
 };
 
+export type ConfidenceLevel = 'low' | 'medium' | 'high';
+
+// One point in an evidence chart's timeline. A given date carries `observed`
+// while it's a real past reading, `projected` once it's a forward-looking
+// estimate; the day they hand off carries both so the two lines meet instead
+// of leaving a gap (see mockData.ts's insightFor for how it's built).
+export type EvidencePoint = {
+  date: string;
+  observed?: number;
+  projected?: number;
+};
+
+// Structured facts behind an Insight, so panels can read fields directly
+// instead of parsing them back out of the prose strings below (spec:
+// GROVEIQ_COMMAND_SPATIAL_REDESIGN_SPEC.md section 8.1). The prose fields
+// (title/evidence/comparison/likelyCause/implication/action) remain the
+// source of truth for existing consumers (TreeCard, Insights, Timeline);
+// these are additive.
 export type Insight = {
   id: string;
   treeId: string | null;
@@ -93,4 +111,24 @@ export type Insight = {
   implication?: string;
   action?: string;
   ts: string;
+
+  headline?: string;
+  detection?: {
+    metric: string;
+    currentValue: number;
+    unit: string;
+    changeWindow?: string;
+  };
+  driver?: {
+    label: string;
+    relationship: 'correlated' | 'likely' | 'confirmed';
+  };
+  confidence?: {
+    level: ConfidenceLevel;
+    rationale: string;
+  };
+  daysToThreshold?: number | null;
+  thresholdValue?: number;
+  thresholdLabel?: string;
+  evidenceSeries?: EvidencePoint[];
 };
