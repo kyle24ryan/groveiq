@@ -166,7 +166,32 @@ Workers-binding (D1/KV) integration tests in one pass:
   comment (not an exact-string pin, since the algorithm's output shifts by
   the input timestamp's time-of-day, not just the date).
 
-Run with `npm test` in `frontend/` or the repo root. **Not done**: React
+Run with `npm test` in `frontend/` or the repo root.
+
+## Trees and Timeline screens (2026-08-14)
+
+Only Overview and Intelligence got the Command+Spatial redesign treatment;
+Trees and Timeline were left as-is. On explicit user request, extended
+the app-wide "worst-first" convention (already used by the sidebar and
+Overview's matrix) to both:
+
+- `Trees.tsx` previously rendered cards in raw array/insertion order --
+  the one screen that disagreed with the rest of the app about which tree
+  matters most. Now sorted worst-first, subtitle states the count needing
+  attention instead of a static description.
+- `Timeline.tsx` previously defaulted to `trees[0]` and listed the tree
+  picker in the same raw order. Now defaults to the priority tree and
+  sorts the picker worst-first, with a status dot per tree matching the
+  sidebar. The scrubbed reading's soil moisture and EC now show an
+  in-range/out-of-range delta (matching Tree Detail's pattern) instead of
+  bare numbers with no interpretation.
+
+**Not done**: a fuller structural rework of either screen (e.g. porting
+Overview's evidence-panel treatment onto Timeline's scrubber) -- these
+were intentionally small, low-risk extensions of an existing convention
+rather than a second full redesign pass.
+
+**Not done**: React
 component/DOM tests (would need `@testing-library/react` + jsdom, a
 bigger addition than fit this pass), and Workers-binding integration
 tests for D1-touching code (`alerts.ts`'s D1 writes, route handlers) —

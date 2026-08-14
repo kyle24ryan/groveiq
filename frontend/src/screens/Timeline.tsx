@@ -1,22 +1,31 @@
 import { useMemo, useState } from 'react';
 import { Card } from '../components/Card';
 import { MetricValue } from '../components/MetricValue';
-import { trees, dailyReadingsFor, milestonesFor } from '../data/mockData';
+import { trees, dailyReadingsFor, milestonesFor, insightFor } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
 import { metricInfo } from '../data/metricInfo';
+import type { Status } from '../data/types';
 
 const RANGE_DAYS = 90;
+const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
+
+// Tree picker and default selection are worst-first, matching the
+// sidebar/Overview convention -- previously defaulted to trees[0] and
+// listed trees in raw array order regardless of what needed attention.
+const sortedTrees = [...trees].sort((a, b) => rank[insightFor(a.id).status] - rank[insightFor(b.id).status]);
 
 export function Timeline() {
   const { system } = useUnits();
-  const [treeId, setTreeId] = useState(trees[0].id);
+  const [treeId, setTreeId] = useState(sortedTrees[0].id);
   const readings = useMemo(() => dailyReadingsFor(treeId, RANGE_DAYS), [treeId]);
   const milestones = useMemo(() => milestonesFor(treeId), [treeId]);
   const [index, setIndex] = useState(readings.length - 1);
 
   const tree = trees.find((t) => t.id === treeId)!;
   const reading = readings[Math.min(index, readings.length - 1)];
+  const moistureInRange = reading.soilMoistureAvg >= tree.soilMoistureThresholdLow && reading.soilMoistureAvg <= tree.soilMoistureThresholdHigh;
+  const ecInRange = reading.soilEcAvg <= tree.ecThresholdHigh;
 
   const rangeStart = new Date(readings[0].date).getTime();
   const rangeEnd = new Date(readings[readings.length - 1].date).getTime();
@@ -42,23 +51,30 @@ export function Timeline() {
       </div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {trees.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => handleTreeChange(t.id)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: 999,
-              border: '1px solid var(--border)',
-              background: t.id === treeId ? 'var(--ink)' : 'var(--surface)',
-              color: t.id === treeId ? 'var(--canvas)' : 'var(--ink)',
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
-          >
-            {t.name}
-          </button>
-        ))}
+        {sortedTrees.map((t) => {
+          const status = insightFor(t.id).status;
+          return (
+            <button
+              key={t.id}
+              onClick={() => handleTreeChange(t.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 999,
+                border: '1px solid var(--border)',
+                background: t.id === treeId ? 'var(--ink)' : 'var(--surface)',
+                color: t.id === treeId ? 'var(--canvas)' : 'var(--ink)',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              <span className={`status-dot status-${status}`} aria-hidden="true" style={t.id === treeId ? { background: 'var(--canvas)' } : undefined} />
+              {t.name}
+            </button>
+          );
+        })}
       </div>
 
       <Card>
@@ -110,9 +126,23 @@ export function Timeline() {
 
         <div className="rgrid-4" style={{ gap: 16, marginTop: 16 }}>
           <MetricValue label="Date" value={reading.date} />
-          <MetricValue label="Soil moisture" value={reading.soilMoistureAvg} unit="%" tooltip={metricInfo.soilMoisture} />
+          <MetricValue
+            label="Soil moisture"
+            value={reading.soilMoistureAvg}
+            unit="%"
+            delta={moistureInRange ? 'In range' : 'Out of range'}
+            deltaTone={moistureInRange ? 'ok' : 'watch'}
+            tooltip={metricInfo.soilMoisture}
+          />
           <MetricValue label="Soil temp" value={formatTemp(reading.soilTempAvg, system)} unit={tempUnit(system)} tooltip={metricInfo.soilTemp} />
-          <MetricValue label="EC" value={reading.soilEcAvg} unit="mS/cm" tooltip={metricInfo.ec} />
+          <MetricValue
+            label="EC"
+            value={reading.soilEcAvg}
+            unit="mS/cm"
+            delta={ecInRange ? 'In range' : 'Elevated'}
+            deltaTone={ecInRange ? 'ok' : 'watch'}
+            tooltip={metricInfo.ec}
+          />
         </div>
       </Card>
 
