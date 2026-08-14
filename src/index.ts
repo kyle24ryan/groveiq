@@ -6,6 +6,8 @@ import { handleAlertsRoute } from './routes/alerts';
 import { handleForecastRoute } from './routes/forecast';
 import { handleNotificationsRoute } from './routes/notifications';
 import { handleTwilioWebhook } from './routes/twilioWebhook';
+import { handleTreesRoute } from './routes/trees';
+import { handleSettingsRoute } from './routes/settings';
 import { fetchEcowittRealTime, writeConditionsReading } from './ecowitt';
 import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
 import { fetchNwsForecast, writeForecasts } from './nws';
@@ -32,6 +34,16 @@ export default {
 
     if (url.pathname.startsWith('/api/v1/trees/') || url.pathname.startsWith('/api/v1/photos/')) {
       const response = await handlePhotosRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname === '/api/v1/trees' || url.pathname.startsWith('/api/v1/trees/')) {
+      const response = await handleTreesRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname === '/api/v1/settings') {
+      const response = await handleSettingsRoute(request, env, url.pathname);
       if (response) return response;
     }
 

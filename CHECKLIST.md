@@ -4,26 +4,43 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-13 (SMS verification flow confirmed working end-to-end; pending A2P 10DLC approval to actually deliver).
+Last updated: 2026-08-13 (editable tree/profile UI landed — trees.ts/settings.ts routes + TreeDetail/Settings edit forms).
 
-## UI/UX backlog (user feedback 2026-08-13, not yet started)
+## UI/UX backlog (user feedback 2026-08-13)
 
 1. Push notifications — new delivery channel, no service worker/subscription
    flow exists yet
 2. Environment (and most screens) still reads as "journal-feeling" despite
    the earlier Linear/Vercel-style redesign — needs another design pass
 3. Grove (home) feels elementary, especially the top metrics/status strip
-4. Trend graphs wherever data exists, collapsible via a graph-icon toggle
-   per card — pattern to match: Ecowitt's own dashboard (icon top-right of
-   each card expands/collapses an inline chart)
-5. Nothing tree-specific is editable via the UI (thresholds, notes, origin,
-   etc.) — same for profile/account info. Everything currently requires a
-   code change + redeploy to update.
-6. `/privacy` and `/terms` look like plain unstyled text, not matching the
-   rest of the app's design system — tension to resolve: they're
-   deliberately static/JS-free (Twilio campaign reviewers, no Access login)
-   but that doesn't mean they can't carry real inline CSS matching the
-   app's palette/type
+   — items 2 and 3 are the remaining "design pass" item, not yet started
+4. [x] Trend graphs wherever data exists, collapsible via a graph-icon
+   toggle per card — matches Ecowitt's dashboard pattern
+5. [x] Tree-specific fields (thresholds, notes, origin, age, stage, pot
+   size) and profile/account info (collection name, owner, location,
+   hardiness zone) are now editable via the UI — see "Editable profiles"
+   below for the scoped limitation on this
+6. [x] `/privacy` and `/terms` restyled to match the app's design system
+   while staying static/JS-free
+
+### Editable profiles — scope note
+
+`GET/PATCH /api/v1/trees/:id` and `GET/PUT /api/v1/settings` (migration
+`0011_app_settings.sql`) back real edit forms on Tree Detail and Settings.
+Scoped deliberately:
+
+- Grove/Trees list cards and demo sensor readings (soil moisture/EC/temp,
+  the insight engine) still come from the static `frontend/src/data/mockData.ts`
+  seed, unchanged — editing a tree's thresholds on Tree Detail updates D1
+  and the profile fields shown there, but doesn't yet feed back into
+  `analyzeTree()`'s status logic on other screens. A full data-wiring pass
+  (replacing the mock seed with live D1 reads everywhere) is a separate,
+  larger task.
+- Tree Detail fetches the live D1 profile on mount and prefers it over the
+  mock profile fields once loaded; falls back to the mock values if the
+  fetch fails (e.g. local dev, where `api.grove-iq.com` is cross-origin and
+  blocked by Access+CORS per `frontend/src/lib/api.ts`'s existing note —
+  same-origin `grove-iq.com/api/*` in production doesn't hit this).
 
 ## Phase 0 — no hardware needed
 

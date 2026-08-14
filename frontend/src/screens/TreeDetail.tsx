@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
@@ -10,7 +10,7 @@ import { metricInfo } from '../data/metricInfo';
 import { trees, speciesReference, dailyReadingsFor, insightFor, milestonesFor, lastWateredFor } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, formatTemp, tempUnit } from '../lib/units';
-import { fetchTreeAnalyses, uploadTreePhoto, photoUrl, type PhotoAnalysis } from '../lib/api';
+import { fetchTreeAnalyses, uploadTreePhoto, photoUrl, fetchTreeProfile, updateTreeProfile, type PhotoAnalysis, type TreeProfile, type TreeProfileEditableFields } from '../lib/api';
 
 export function TreeDetail() {
   const { system } = useUnits();
@@ -21,6 +21,12 @@ export function TreeDetail() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [profile, setProfile] = useState<TreeProfile | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<TreeProfileEditableFields>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!treeId) return;
@@ -33,10 +39,55 @@ export function TreeDetail() {
         // Imagery section falls back to placeholders below; not worth a
         // hard error banner for a background fetch.
       });
+    fetchTreeProfile(treeId)
+      .then((p) => {
+        if (!cancelled) setProfile(p);
+      })
+      .catch(() => {
+        // Falls back to the static demo profile below (e.g. local dev
+        // without a same-origin API, or the tree isn't seeded in D1 yet).
+      });
     return () => {
       cancelled = true;
     };
   }, [treeId]);
+
+  function startEdit() {
+    if (!profile) return;
+    setDraft({
+      name: profile.name,
+      nickname: profile.nickname ?? '',
+      pot_size_liters: profile.pot_size_liters,
+      origin_notes: profile.origin_notes ?? '',
+      origin_type: profile.origin_type ?? '',
+      acquired_date: profile.acquired_date ?? '',
+      estimated_age_years_low: profile.estimated_age_years_low,
+      estimated_age_years_high: profile.estimated_age_years_high,
+      development_stage: profile.development_stage ?? '',
+      notes: profile.notes ?? '',
+      soil_moisture_threshold_low: profile.soil_moisture_threshold_low,
+      soil_moisture_threshold_high: profile.soil_moisture_threshold_high,
+      ec_threshold_high: profile.ec_threshold_high,
+      dormancy_soil_temp_c: profile.dormancy_soil_temp_c,
+    });
+    setSaveError(null);
+    setEditing(true);
+  }
+
+  async function handleSaveProfile() {
+    if (!treeId) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const updated = await updateTreeProfile(treeId, draft);
+      setProfile(updated);
+      setEditing(false);
+    } catch (err) {
+      setSaveError(String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleFileSelected(file: File) {
     if (!treeId) return;
@@ -68,8 +119,22 @@ export function TreeDetail() {
   const species = speciesReference.find((s) => s.species === tree.species);
   const lastWatered = lastWateredFor(tree.id);
 
-  const moistureInRange = latest.soilMoistureAvg >= tree.soilMoistureThresholdLow && latest.soilMoistureAvg <= tree.soilMoistureThresholdHigh;
-  const ecInRange = latest.soilEcAvg <= tree.ecThresholdHigh;
+  // Editable fields prefer the live D1 profile once it loads; fall back to
+  // the static demo profile (used for sensor-reading generation regardless).
+  const displayName = profile?.name ?? tree.name;
+  const displayNickname = profile ? profile.nickname : tree.nickname;
+  const ageLow = profile ? profile.estimated_age_years_low : tree.estimatedAgeYearsLow;
+  const ageHigh = profile ? profile.estimated_age_years_high : tree.estimatedAgeYearsHigh;
+  const developmentStage = profile?.development_stage ?? tree.developmentStage;
+  const moistureLow = profile?.soil_moisture_threshold_low ?? tree.soilMoistureThresholdLow;
+  const moistureHigh = profile?.soil_moisture_threshold_high ?? tree.soilMoistureThresholdHigh;
+  const ecThresholdHigh = profile?.ec_threshold_high ?? tree.ecThresholdHigh;
+  const dormancySoilTempC = profile?.dormancy_soil_temp_c ?? tree.dormancySoilTempC;
+  const potSizeLiters = profile ? profile.pot_size_liters : tree.potSizeLiters;
+  const notes = profile ? profile.notes : tree.notes;
+
+  const moistureInRange = latest.soilMoistureAvg >= moistureLow && latest.soilMoistureAvg <= moistureHigh;
+  const ecInRange = latest.soilEcAvg <= ecThresholdHigh;
   const readingsInDisplayUnits = readings.map((r) => ({ ...r, soilTempAvg: convertTemp(r.soilTempAvg, system) }));
 
   return (
@@ -81,24 +146,55 @@ export function TreeDetail() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 8, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 24 }}>
-              {tree.name}
-              {tree.nickname && <span style={{ color: 'var(--ink-soft)', fontWeight: 500 }}> "{tree.nickname}"</span>}
+              {displayName}
+              {displayNickname && <span style={{ color: 'var(--ink-soft)', fontWeight: 500 }}> "{displayNickname}"</span>}
             </h1>
             <div style={{ color: 'var(--ink-soft)', fontSize: 13.5, marginTop: 4 }}>
               <Link to={`/species/${encodeURIComponent(tree.species)}`} style={{ color: 'inherit', textDecoration: 'underline' }}>
                 {tree.species}
               </Link>
               {' · '}
-              {tree.estimatedAgeYearsLow && tree.estimatedAgeYearsHigh
-                ? `~${tree.estimatedAgeYearsLow}-${tree.estimatedAgeYearsHigh} years old`
-                : 'age unknown'}
+              {ageLow && ageHigh ? `~${ageLow}-${ageHigh} years old` : 'age unknown'}
               {' · '}
-              <span style={{ textTransform: 'capitalize' }}>{tree.developmentStage}</span>
+              <span style={{ textTransform: 'capitalize' }}>{developmentStage}</span>
             </div>
           </div>
-          <StatusBadge status={insight.status} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {!editing && (
+              <button
+                type="button"
+                onClick={startEdit}
+                disabled={!profile}
+                title={!profile ? 'Loading profile…' : undefined}
+                style={{
+                  fontSize: 12.5,
+                  padding: '5px 12px',
+                  borderRadius: 999,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--ink)',
+                  cursor: profile ? 'pointer' : 'default',
+                  opacity: profile ? 1 : 0.5,
+                }}
+              >
+                Edit profile
+              </button>
+            )}
+            <StatusBadge status={insight.status} />
+          </div>
         </div>
       </div>
+
+      {editing && (
+        <TreeProfileEditForm
+          draft={draft}
+          setDraft={setDraft}
+          onCancel={() => setEditing(false)}
+          onSave={handleSaveProfile}
+          saving={saving}
+          error={saveError}
+        />
+      )}
 
       <InsightPanel insight={insight} />
 
@@ -141,7 +237,7 @@ export function TreeDetail() {
                 <InfoTooltip text={metricInfo.moistureRange} />
               </div>
               <div className="mono" style={{ marginTop: 2 }}>
-                {tree.soilMoistureThresholdLow}-{tree.soilMoistureThresholdHigh}%
+                {moistureLow}-{moistureHigh}%
               </div>
             </div>
             <div>
@@ -150,7 +246,7 @@ export function TreeDetail() {
                 <InfoTooltip text={metricInfo.ecCeiling} />
               </div>
               <div className="mono" style={{ marginTop: 2 }}>
-                {tree.ecThresholdHigh} mS/cm
+                {ecThresholdHigh} mS/cm
               </div>
             </div>
             <div>
@@ -159,13 +255,13 @@ export function TreeDetail() {
                 <InfoTooltip text={metricInfo.dormancyTrigger} />
               </div>
               <div className="mono" style={{ marginTop: 2 }}>
-                {formatTemp(tree.dormancySoilTempC, system)}{tempUnit(system)} soil temp
+                {formatTemp(dormancySoilTempC, system)}{tempUnit(system)} soil temp
               </div>
             </div>
             <div>
               <div style={{ color: 'var(--ink-soft)' }}>Pot size</div>
               <div className="mono" style={{ marginTop: 2 }}>
-                {tree.potSizeLiters ? `${tree.potSizeLiters}L` : 'not measured yet'}
+                {potSizeLiters ? `${potSizeLiters}L` : 'not measured yet'}
               </div>
             </div>
           </div>
@@ -318,16 +414,158 @@ export function TreeDetail() {
         </Card>
       </div>
 
-      {tree.notes && (
+      {notes && (
         <div>
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             Notes
           </div>
           <Card>
-            <p style={{ fontSize: 13.5 }}>{tree.notes}</p>
+            <p style={{ fontSize: 13.5 }}>{notes}</p>
           </Card>
         </div>
       )}
     </div>
+  );
+}
+
+const inputStyle: CSSProperties = {
+  width: '100%',
+  padding: '7px 10px',
+  borderRadius: 6,
+  border: '1px solid var(--border)',
+  background: 'var(--canvas)',
+  color: 'var(--ink)',
+  fontSize: 13.5,
+};
+
+function EditField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string | number;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  return (
+    <label style={{ display: 'block' }}>
+      <div style={{ color: 'var(--ink-soft)', fontSize: 12, marginBottom: 4 }}>{label}</div>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} style={inputStyle} />
+    </label>
+  );
+}
+
+function TreeProfileEditForm({
+  draft,
+  setDraft,
+  onCancel,
+  onSave,
+  saving,
+  error,
+}: {
+  draft: TreeProfileEditableFields;
+  setDraft: Dispatch<SetStateAction<TreeProfileEditableFields>>;
+  onCancel: () => void;
+  onSave: () => void;
+  saving: boolean;
+  error: string | null;
+}) {
+  function setField<K extends keyof TreeProfileEditableFields>(key: K, raw: string) {
+    const numericFields: (keyof TreeProfileEditableFields)[] = [
+      'pot_size_liters',
+      'estimated_age_years_low',
+      'estimated_age_years_high',
+      'soil_moisture_threshold_low',
+      'soil_moisture_threshold_high',
+      'ec_threshold_high',
+      'dormancy_soil_temp_c',
+    ];
+    if (numericFields.includes(key)) {
+      setDraft((prev) => ({ ...prev, [key]: raw === '' ? null : Number(raw) }));
+    } else {
+      setDraft((prev) => ({ ...prev, [key]: raw }));
+    }
+  }
+
+  return (
+    <Card style={{ borderColor: 'var(--insight)' }}>
+      <div className="eyebrow" style={{ marginBottom: 12, color: 'var(--insight)' }}>
+        Edit profile
+      </div>
+      {error && <p style={{ fontSize: 12.5, color: 'var(--urgent)', marginBottom: 12 }}>{error}</p>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 16 }}>
+        <EditField label="Name" value={draft.name ?? ''} onChange={(v) => setField('name', v)} />
+        <EditField label="Nickname" value={draft.nickname ?? ''} onChange={(v) => setField('nickname', v)} />
+        <EditField label="Development stage" value={draft.development_stage ?? ''} onChange={(v) => setField('development_stage', v)} />
+        <EditField label="Pot size (L)" type="number" value={draft.pot_size_liters ?? ''} onChange={(v) => setField('pot_size_liters', v)} />
+        <EditField label="Age low (yrs)" type="number" value={draft.estimated_age_years_low ?? ''} onChange={(v) => setField('estimated_age_years_low', v)} />
+        <EditField label="Age high (yrs)" type="number" value={draft.estimated_age_years_high ?? ''} onChange={(v) => setField('estimated_age_years_high', v)} />
+        <EditField label="Origin type" value={draft.origin_type ?? ''} onChange={(v) => setField('origin_type', v)} />
+        <EditField label="Acquired date" type="date" value={draft.acquired_date ?? ''} onChange={(v) => setField('acquired_date', v)} />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ color: 'var(--ink-soft)', fontSize: 12, marginBottom: 4 }}>Origin notes</div>
+        <textarea
+          value={draft.origin_notes ?? ''}
+          onChange={(e) => setField('origin_notes', e.target.value)}
+          rows={2}
+          style={{ ...inputStyle, resize: 'vertical' }}
+        />
+      </div>
+
+      <div className="eyebrow" style={{ marginBottom: 10, fontSize: 11 }}>
+        Thresholds
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 16 }}>
+        <EditField label="Moisture low (%)" type="number" value={draft.soil_moisture_threshold_low ?? ''} onChange={(v) => setField('soil_moisture_threshold_low', v)} />
+        <EditField label="Moisture high (%)" type="number" value={draft.soil_moisture_threshold_high ?? ''} onChange={(v) => setField('soil_moisture_threshold_high', v)} />
+        <EditField label="EC ceiling (mS/cm)" type="number" value={draft.ec_threshold_high ?? ''} onChange={(v) => setField('ec_threshold_high', v)} />
+        <EditField label="Dormancy soil temp (°C)" type="number" value={draft.dormancy_soil_temp_c ?? ''} onChange={(v) => setField('dormancy_soil_temp_c', v)} />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ color: 'var(--ink-soft)', fontSize: 12, marginBottom: 4 }}>Notes</div>
+        <textarea value={draft.notes ?? ''} onChange={(e) => setField('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={onSave}
+          disabled={saving}
+          style={{
+            padding: '7px 16px',
+            borderRadius: 8,
+            border: 'none',
+            background: 'var(--ink)',
+            color: 'var(--canvas)',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: saving ? 'default' : 'pointer',
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          style={{
+            padding: '7px 16px',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--ink)',
+            fontSize: 13,
+            cursor: saving ? 'default' : 'pointer',
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </Card>
   );
 }

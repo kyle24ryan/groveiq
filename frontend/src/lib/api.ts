@@ -226,3 +226,90 @@ export async function withdrawSmsConsent(): Promise<{ ok: boolean; error?: strin
   if (!res.ok) return { ok: false, error: body.error };
   return { ok: true };
 }
+
+// --- Tree profile editing ---
+
+export type TreeProfile = {
+  id: string;
+  name: string;
+  nickname: string | null;
+  species: string;
+  pot_size_liters: number | null;
+  origin_notes: string | null;
+  origin_type: string | null;
+  acquired_date: string | null;
+  estimated_age_years_low: number | null;
+  estimated_age_years_high: number | null;
+  development_stage: string | null;
+  notes: string | null;
+  soil_moisture_threshold_low: number | null;
+  soil_moisture_threshold_high: number | null;
+  ec_threshold_high: number | null;
+  dormancy_soil_temp_c: number | null;
+  created_at: string;
+};
+
+export type TreeProfileEditableFields = Partial<
+  Pick<
+    TreeProfile,
+    | 'name'
+    | 'nickname'
+    | 'pot_size_liters'
+    | 'origin_notes'
+    | 'origin_type'
+    | 'acquired_date'
+    | 'estimated_age_years_low'
+    | 'estimated_age_years_high'
+    | 'development_stage'
+    | 'notes'
+    | 'soil_moisture_threshold_low'
+    | 'soil_moisture_threshold_high'
+    | 'ec_threshold_high'
+    | 'dormancy_soil_temp_c'
+  >
+>;
+
+export async function fetchTreeProfile(treeId: string): Promise<TreeProfile> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}`);
+  if (!res.ok) throw new Error(`tree fetch failed: ${res.status}`);
+  const body = (await res.json()) as { tree: TreeProfile };
+  return body.tree;
+}
+
+export async function updateTreeProfile(treeId: string, fields: TreeProfileEditableFields): Promise<TreeProfile> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
+  const body = (await res.json()) as { tree?: TreeProfile; error?: string };
+  if (!res.ok || !body.tree) throw new Error(body.error || `tree update failed: ${res.status}`);
+  return body.tree;
+}
+
+// --- Grove/app settings ---
+
+export type AppSettings = {
+  collection_name?: string;
+  owner_name?: string;
+  location?: string;
+  hardiness_zone?: string;
+};
+
+export async function fetchAppSettings(): Promise<AppSettings> {
+  const res = await apiFetch(`${API_BASE}/settings`);
+  if (!res.ok) throw new Error(`settings fetch failed: ${res.status}`);
+  const body = (await res.json()) as { settings: AppSettings };
+  return body.settings;
+}
+
+export async function updateAppSettings(fields: AppSettings): Promise<AppSettings> {
+  const res = await apiFetch(`${API_BASE}/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
+  const body = (await res.json()) as { settings?: AppSettings; error?: string };
+  if (!res.ok || !body.settings) throw new Error(body.error || `settings update failed: ${res.status}`);
+  return body.settings;
+}

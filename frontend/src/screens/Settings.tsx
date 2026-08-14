@@ -4,9 +4,16 @@ import { Card } from '../components/Card';
 import { trees } from '../data/mockData';
 import { useUnits, type UnitSystem } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
-import { fetchLatestConditions, freshnessLabel, type ConditionsReading } from '../lib/api';
+import { fetchLatestConditions, freshnessLabel, fetchAppSettings, updateAppSettings, type ConditionsReading, type AppSettings } from '../lib/api';
 
 type ThresholdStrategy = 'groveiq' | 'species' | 'custom';
+
+const SETTINGS_FIELDS: { key: keyof AppSettings; label: string }[] = [
+  { key: 'collection_name', label: 'Collection name' },
+  { key: 'owner_name', label: 'Owner' },
+  { key: 'location', label: 'Location' },
+  { key: 'hardiness_zone', label: 'Hardiness zone' },
+];
 
 export function Settings() {
   const [strategy, setStrategy] = useState<ThresholdStrategy>('groveiq');
@@ -36,17 +43,7 @@ export function Settings() {
         <p style={{ color: 'var(--ink-soft)', marginTop: 4, fontSize: 14 }}>Grove preferences, devices, notifications, and thresholds.</p>
       </div>
 
-      <Card>
-        <div className="eyebrow" style={{ marginBottom: 12 }}>
-          Profile & grove
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13.5 }}>
-          <Field label="Collection name" value="Grove Collection" />
-          <Field label="Owner" value="Kyle Ryan" />
-          <Field label="Location" value="North Bend, WA" />
-          <Field label="Hardiness zone" value="USDA 8b" />
-        </div>
-      </Card>
+      <ProfileCard />
 
       <Card>
         <div className="eyebrow" style={{ marginBottom: 12 }}>
@@ -232,6 +229,142 @@ function Field({ label, value }: { label: string; value: string }) {
       <div style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{label}</div>
       <div style={{ marginTop: 2 }}>{value}</div>
     </div>
+  );
+}
+
+function ProfileCard() {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<AppSettings>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppSettings()
+      .then((s) => {
+        if (!cancelled) setSettings(s);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function startEdit() {
+    setDraft(settings ?? {});
+    setError(null);
+    setEditing(true);
+  }
+
+  async function handleSave() {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await updateAppSettings(draft);
+      setSettings(updated);
+      setEditing(false);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div className="eyebrow">Profile & grove</div>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            disabled={!settings}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              fontSize: 12,
+              cursor: settings ? 'pointer' : 'default',
+              opacity: settings ? 1 : 0.5,
+            }}
+          >
+            Edit
+          </button>
+        )}
+      </div>
+
+      {error && <p style={{ fontSize: 12.5, color: 'var(--urgent)', marginBottom: 12 }}>{error}</p>}
+
+      {!editing ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13.5 }}>
+          {SETTINGS_FIELDS.map((f) => (
+            <Field key={f.key} label={f.label} value={settings?.[f.key] ?? '—'} />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13.5 }}>
+            {SETTINGS_FIELDS.map((f) => (
+              <label key={f.key} style={{ display: 'block' }}>
+                <div style={{ color: 'var(--ink-soft)', fontSize: 12, marginBottom: 4 }}>{f.label}</div>
+                <input
+                  type="text"
+                  value={draft[f.key] ?? ''}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '7px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--border)',
+                    background: 'var(--canvas)',
+                    color: 'var(--ink)',
+                    fontSize: 13.5,
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button
+              onClick={handleSave}
+              disabled={busy}
+              style={{
+                padding: '7px 16px',
+                borderRadius: 8,
+                border: 'none',
+                background: 'var(--ink)',
+                color: 'var(--canvas)',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: busy ? 'default' : 'pointer',
+                opacity: busy ? 0.6 : 1,
+              }}
+            >
+              {busy ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              disabled={busy}
+              style={{
+                padding: '7px 16px',
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--ink)',
+                fontSize: 13,
+                cursor: busy ? 'default' : 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 

@@ -479,3 +479,17 @@ CREATE TABLE IF NOT EXISTS sms_send_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_sms_send_log_created ON sms_send_log(created_at);
+
+-- Simple key-value settings for the "Profile & grove" fields in Settings
+-- (migration 0011).
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT OR IGNORE INTO app_settings (key, value) VALUES
+  ('collection_name', 'Grove Collection'),
+  ('owner_name', 'Kyle Ryan'),
+  ('location', 'North Bend, WA'),
+  ('hardiness_zone', 'USDA 8b');

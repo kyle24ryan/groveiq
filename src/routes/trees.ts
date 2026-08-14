@@ -1,0 +1,98 @@
+import type { Env } from '../env';
+import { corsHeaders } from './conditions';
+
+type TreeRow = {
+  id: string;
+  name: string;
+  nickname: string | null;
+  species: string;
+  pot_size_liters: number | null;
+  origin_notes: string | null;
+  origin_type: string | null;
+  acquired_date: string | null;
+  estimated_age_years_low: number | null;
+  estimated_age_years_high: number | null;
+  development_stage: string | null;
+  notes: string | null;
+  soil_moisture_threshold_low: number | null;
+  soil_moisture_threshold_high: number | null;
+  ec_threshold_high: number | null;
+  dormancy_soil_temp_c: number | null;
+  created_at: string;
+};
+
+// Fields a user can actually edit -- id/species/created_at are fixed.
+const EDITABLE_FIELDS = [
+  'name',
+  'nickname',
+  'pot_size_liters',
+  'origin_notes',
+  'origin_type',
+  'acquired_date',
+  'estimated_age_years_low',
+  'estimated_age_years_high',
+  'development_stage',
+  'notes',
+  'soil_moisture_threshold_low',
+  'soil_moisture_threshold_high',
+  'ec_threshold_high',
+  'dormancy_soil_temp_c',
+] as const;
+
+async function handleListTrees(env: Env, headers: HeadersInit): Promise<Response> {
+  const { results } = await env.DB.prepare('SELECT * FROM trees ORDER BY name').all<TreeRow>();
+  return Response.json({ trees: results }, { headers });
+}
+
+async function handleGetTree(env: Env, id: string, headers: HeadersInit): Promise<Response> {
+  const row = await env.DB.prepare('SELECT * FROM trees WHERE id = ?').bind(id).first<TreeRow>();
+  if (!row) return Response.json({ error: 'not_found' }, { status: 404, headers });
+  return Response.json({ tree: row }, { headers });
+}
+
+async function handlePatchTree(request: Request, env: Env, id: string, headers: HeadersInit): Promise<Response> {
+  const body = (await request.json()) as Partial<Record<(typeof EDITABLE_FIELDS)[number], unknown>>;
+
+  const setClauses: string[] = [];
+  const values: unknown[] = [];
+  for (const field of EDITABLE_FIELDS) {
+    if (field in body) {
+      setClauses.push(`${field} = ?`);
+      values.push(body[field]);
+    }
+  }
+  if (setClauses.length === 0) {
+    return Response.json({ error: 'no_editable_fields_provided' }, { status: 400, headers });
+  }
+
+  values.push(id);
+  const result = await env.DB.prepare(`UPDATE trees SET ${setClauses.join(', ')} WHERE id = ?`)
+    .bind(...values)
+    .run();
+
+  if (result.meta.changes === 0) {
+    return Response.json({ error: 'not_found' }, { status: 404, headers });
+  }
+
+  return handleGetTree(env, id, headers);
+}
+
+export async function handleTreesRoute(request: Request, env: Env, pathname: string): Promise<Response | null> {
+  const listMatch = pathname === '/api/v1/trees';
+  const singleMatch = pathname.match(/^\/api\/v1\/trees\/([^/]+)$/);
+  if (!listMatch && !singleMatch) return null;
+
+  const headers = corsHeaders(request);
+  if (request.method === 'OPTIONS') return new Response(null, { headers });
+
+  if (listMatch && request.method === 'GET') {
+    return handleListTrees(env, headers);
+  }
+  if (singleMatch && request.method === 'GET') {
+    return handleGetTree(env, singleMatch[1], headers);
+  }
+  if (singleMatch && request.method === 'PATCH') {
+    return handlePatchTree(request, env, singleMatch[1], headers);
+  }
+  return null;
+}
