@@ -6,6 +6,7 @@ import { PriorityIntelligencePanel } from '../components/overview/PriorityIntell
 import { GroveConditionStrip } from '../components/overview/GroveConditionStrip';
 import { CollectionStatusMatrix } from '../components/overview/CollectionStatusMatrix';
 import { NextRiskPanel } from '../components/overview/NextRiskPanel';
+import { SpatialEvidencePanel } from '../components/spatial/SpatialEvidencePanel';
 
 export function Grove() {
   const { latest, regionalAqi, forecast, counts, needsAttention, priorityInsight, priorityTree, vpd, demand, freshness, sortedTrees } = useGroveOverview();
@@ -25,7 +26,12 @@ export function Grove() {
 
       <AlertBanner />
 
-      {needsAttention > 0 && priorityTree && <PriorityIntelligencePanel insight={priorityInsight} tree={priorityTree} sibling={sibling} />}
+      {needsAttention > 0 && priorityTree && (
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'start' }}>
+          <PriorityIntelligencePanel insight={priorityInsight} tree={priorityTree} sibling={sibling} />
+          <SpatialEvidencePanel insight={priorityInsight} tree={priorityTree} latest={latest} freshnessLabel={freshness.label} />
+        </div>
+      )}
 
       <div>
         <div className="eyebrow" style={{ marginBottom: 10 }}>

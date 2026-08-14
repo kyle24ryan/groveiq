@@ -373,9 +373,11 @@ export function Environment() {
 
           <div>
             <div className="eyebrow" style={{ marginBottom: 10 }}>
-              Regional maps
+              Regional source maps
             </div>
-            <RegionalMaps />
+            <Collapsible trigger="Windy & PurpleAir (third-party embeds)">
+              <RegionalMaps />
+            </Collapsible>
           </div>
 
           <Card style={{ borderColor: 'var(--insight)' }}>

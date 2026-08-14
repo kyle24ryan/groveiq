@@ -27,9 +27,30 @@ upfront. Status:
   grid on Overview only — Trees.tsx still uses TreeCard, unchanged), and
   `NextRiskPanel`. Route stays `/`; nav label still reads "Grove" (rename is
   Phase 4).
-- [ ] Phase 3 — native spatial evidence panel. **Blocked on a map library
-  decision** (MapLibre vs. staying Windy/PurpleAir-only) — ask before
-  building. Deferred rather than shipping a placeholder.
+- [x] Phase 3 — native spatial evidence panel, shipped 2026-08-14 once the
+  user provided a Mapbox public token. New `components/spatial/GroveMap.tsx`
+  (Mapbox GL JS, `light-v11` style, grove marker + wind-direction vector —
+  deliberately no invented regional contours per spec's data-limitation
+  section, since the repo only has a point location and point-in-time
+  readings) and `SpatialEvidencePanel.tsx` ("Why here, why now?": map +
+  wind/affected-tree/freshness summary tied to the active priority signal).
+  Wired into Overview beside `PriorityIntelligencePanel`. Windy/PurpleAir
+  demoted to a collapsed-by-default "Regional source maps" disclosure on
+  Environment (via the existing `Collapsible` — iframes don't mount until
+  expanded, satisfying spec 18's lazy-load requirement for free).
+  **Mapbox GL JS is code-split** (`React.lazy`) since it added ~500KB
+  gzipped to the main bundle otherwise (spec 18 explicitly warns about
+  this) — confirmed via a real build that the main bundle returned to its
+  pre-Mapbox size and the library only loads when the panel renders.
+  Token lives in `frontend/.env.local` (gitignored, not committed) as
+  `VITE_MAPBOX_TOKEN`; it's a public `pk.` token so embedding it in the
+  client bundle is expected/safe, not a leaked secret — recommended the
+  user add a URL restriction (grove-iq.com + localhost) on Mapbox's side.
+  **Not done**: the fuller Environment→"Spatial" surface rebuild from spec
+  section 7 (layer model with Air&smoke/Wind exposure/Frost risk/
+  Precipitation each swapping map overlay+interpretation+affected-trees+
+  legend+freshness together) — this shipped only the Overview-side spatial
+  evidence panel, which was Phase 3's actual scope.
 - [x] Phase 4 (partial) — nav labels renamed (Grove→Overview, Insights→
   Intelligence; Insights.tsx's own heading updated to match). Sidebar is
   now a responsive off-canvas drawer below 768px (hamburger top bar,
