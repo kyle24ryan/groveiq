@@ -67,7 +67,7 @@ export function PriorityIntelligencePanel({
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+      <div className="rgrid-3" style={{ gap: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <EvidenceField
           label="Detected"
           value={insight.detection ? `${insight.detection.metric} ${insight.detection.currentValue}${insight.detection.unit}${insight.detection.changeWindow ? ` (${insight.detection.changeWindow})` : ''}` : insight.evidence}

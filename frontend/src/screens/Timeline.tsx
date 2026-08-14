@@ -108,7 +108,7 @@ export function Timeline() {
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
+        <div className="rgrid-4" style={{ gap: 16, marginTop: 16 }}>
           <MetricValue label="Date" value={reading.date} />
           <MetricValue label="Soil moisture" value={reading.soilMoistureAvg} unit="%" tooltip={metricInfo.soilMoisture} />
           <MetricValue label="Soil temp" value={formatTemp(reading.soilTempAvg, system)} unit={tempUnit(system)} tooltip={metricInfo.soilTemp} />

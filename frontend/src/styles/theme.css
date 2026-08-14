@@ -10,7 +10,14 @@
   /* Text */
   --ink: #18181B;
   --ink-soft: #6B7280;
-  --ink-faint: #9CA3AF;
+  /* ink-faint/neutral were #9CA3AF (2.4:1 on canvas/surface) -- fails WCAG
+     AA even at the loosest 3:1 UI-component threshold, and this token is
+     real body text (timestamps, forecast labels, disclaimers), not
+     decoration. At this palette's neutral-gray hue there's no headroom
+     for a third tier fainter than --ink-soft that still clears 4.5:1, so
+     it matches --ink-soft here; dark mode has more luminance room to keep
+     them visually distinct. */
+  --ink-faint: #6B7280;
 
   /* Borders */
   --border: #E5E7EB;
@@ -23,7 +30,7 @@
   --watch-bg: #FDF3E7;
   --urgent: #B91C1C;
   --urgent-bg: #FCEAEA;
-  --neutral: #9CA3AF;
+  --neutral: #6B7280;
   --neutral-bg: #F3F4F6;
 
   /* Intelligence / forecast accent */
@@ -50,7 +57,10 @@
 
     --ink: #F4F4F5;
     --ink-soft: #A1A1AA;
-    --ink-faint: #71717A;
+    /* was #71717A (3.6:1 on surface) -- failed AA-normal-text; dark mode
+       has enough luminance room to keep this visually distinct from
+       --ink-soft while still passing 4.5:1 everywhere it's used. */
+    --ink-faint: #8B8B94;
 
     --border: #27272A;
     --border-strong: #3F3F46;
@@ -61,7 +71,7 @@
     --watch-bg: rgba(251, 191, 36, 0.12);
     --urgent: #F87171;
     --urgent-bg: rgba(248, 113, 113, 0.12);
-    --neutral: #71717A;
+    --neutral: #8B8B94;
     --neutral-bg: rgba(113, 113, 122, 0.12);
 
     --insight: #A5A6F6;
@@ -158,6 +168,33 @@ input:focus-visible,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Responsive grid utilities (spec 11): replace ad-hoc inline
+   gridTemplateColumns wherever content must reflow at narrow widths.
+   Components keep gap/alignItems/etc. as inline style -- only the
+   column count lives here, since inline styles can't be overridden by a
+   media query and this property is the one that actually needs to change
+   per breakpoint. Breakpoints match Layout.tsx's own mobile cutover. */
+.rgrid-2, .rgrid-3, .rgrid-4, .rgrid-sidebar {
+  display: grid;
+}
+.rgrid-2 { grid-template-columns: 1fr 1fr; }
+.rgrid-3 { grid-template-columns: repeat(3, 1fr); }
+.rgrid-4 { grid-template-columns: repeat(4, 1fr); }
+.rgrid-sidebar { grid-template-columns: 2fr 1fr; }
+
+@media (max-width: 900px) {
+  .rgrid-sidebar { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .rgrid-2, .rgrid-4 { grid-template-columns: 1fr 1fr; }
+  .rgrid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .rgrid-2, .rgrid-3, .rgrid-4 { grid-template-columns: 1fr; }
 }
 
 /* Responsive nav (spec 11): the sidebar is always-visible above 768px.

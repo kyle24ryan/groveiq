@@ -203,7 +203,7 @@ export function TreeDetail() {
         <div className="eyebrow" style={{ marginBottom: 10 }}>
           Soil
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <div className="rgrid-4" style={{ gap: 16 }}>
           <Card>
             <MetricValue
               label="Soil moisture"
@@ -231,7 +231,7 @@ export function TreeDetail() {
           Baselines & thresholds
         </div>
         <Card>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, fontSize: 13 }}>
+          <div className="rgrid-4" style={{ gap: 16, fontSize: 13 }}>
             <div>
               <div style={{ color: 'var(--ink-soft)' }}>
                 Moisture range
@@ -395,7 +395,7 @@ export function TreeDetail() {
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="rgrid-2" style={{ gap: 16 }}>
         <ReadingChart title="Soil moisture — last 30 days" data={readings} dataKey="soilMoistureAvg" color="var(--ok)" unit="%" />
         <ReadingChart title="Soil temperature — last 30 days" data={readingsInDisplayUnits} dataKey="soilTempAvg" color="var(--insight)" unit={tempUnit(system)} />
       </div>
@@ -504,7 +504,7 @@ function TreeProfileEditForm({
       </div>
       {error && <p style={{ fontSize: 12.5, color: 'var(--urgent)', marginBottom: 12 }}>{error}</p>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 16 }}>
+      <div className="rgrid-3" style={{ gap: 14, marginBottom: 16 }}>
         <EditField label="Name" value={draft.name ?? ''} onChange={(v) => setField('name', v)} />
         <EditField label="Nickname" value={draft.nickname ?? ''} onChange={(v) => setField('nickname', v)} />
         <EditField label="Development stage" value={draft.development_stage ?? ''} onChange={(v) => setField('development_stage', v)} />
@@ -528,7 +528,7 @@ function TreeProfileEditForm({
       <div className="eyebrow" style={{ marginBottom: 10, fontSize: 11 }}>
         Thresholds
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 16 }}>
+      <div className="rgrid-4" style={{ gap: 14, marginBottom: 16 }}>
         <EditField label="Moisture low (%)" type="number" value={draft.soil_moisture_threshold_low ?? ''} onChange={(v) => setField('soil_moisture_threshold_low', v)} />
         <EditField label="Moisture high (%)" type="number" value={draft.soil_moisture_threshold_high ?? ''} onChange={(v) => setField('soil_moisture_threshold_high', v)} />
         <EditField label="EC ceiling (mS/cm)" type="number" value={draft.ec_threshold_high ?? ''} onChange={(v) => setField('ec_threshold_high', v)} />

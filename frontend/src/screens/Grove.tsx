@@ -27,7 +27,7 @@ export function Grove() {
       <AlertBanner />
 
       {needsAttention > 0 && priorityTree && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'start' }}>
+        <div className="rgrid-sidebar" style={{ gap: 16, alignItems: 'start' }}>
           <PriorityIntelligencePanel insight={priorityInsight} tree={priorityTree} sibling={sibling} />
           <SpatialEvidencePanel insight={priorityInsight} tree={priorityTree} latest={latest} freshnessLabel={freshness.label} />
         </div>
@@ -40,7 +40,7 @@ export function Grove() {
         <GroveConditionStrip latest={latest} regionalAqi={regionalAqi} demand={demand} vpd={vpd} freshnessLabel={freshness.label} freshnessStale={freshness.stale} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'start' }}>
+      <div className="rgrid-sidebar" style={{ gap: 16, alignItems: 'start' }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             Collection

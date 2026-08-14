@@ -87,7 +87,7 @@ export function Settings() {
             standard scientific units regardless of this setting.
           </p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13.5 }}>
+        <div className="rgrid-2" style={{ gap: 16, fontSize: 13.5 }}>
           <Field label="Timezone" value="America/Los_Angeles" />
         </div>
       </Card>
@@ -302,14 +302,14 @@ function ProfileCard() {
       {error && <p style={{ fontSize: 12.5, color: 'var(--urgent)', marginBottom: 12 }}>{error}</p>}
 
       {!editing ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13.5 }}>
+        <div className="rgrid-2" style={{ gap: 16, fontSize: 13.5 }}>
           {SETTINGS_FIELDS.map((f) => (
             <Field key={f.key} label={f.label} value={settings?.[f.key] ?? '—'} />
           ))}
         </div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13.5 }}>
+          <div className="rgrid-2" style={{ gap: 16, fontSize: 13.5 }}>
             {SETTINGS_FIELDS.map((f) => (
               <label key={f.key} style={{ display: 'block' }}>
                 <div style={{ color: 'var(--ink-soft)', fontSize: 12, marginBottom: 4 }}>{f.label}</div>

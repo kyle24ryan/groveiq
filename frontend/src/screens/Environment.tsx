@@ -153,7 +153,7 @@ export function Environment() {
       )}
 
       <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <div className="rgrid-3" style={{ gap: 12 }}>
             <Card>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                 <div className="eyebrow">Outdoor</div>
@@ -301,7 +301,7 @@ export function Environment() {
             )}
           </Card>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="rgrid-2" style={{ gap: 16 }}>
             <Card>
               <div className="eyebrow" style={{ marginBottom: 6 }}>
                 Water demand

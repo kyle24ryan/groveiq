@@ -48,7 +48,7 @@ export function TreeCompare() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="rgrid-2" style={{ gap: 16 }}>
         {[
           { tree: treeA, a: a },
           { tree: treeB, a: b },
@@ -63,7 +63,7 @@ export function TreeCompare() {
               </div>
               <StatusBadge status={analysis.status} size="sm" />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className="rgrid-2" style={{ gap: 14 }}>
               <MetricValue label="Soil moisture" value={analysis.latest.soilMoistureAvg} unit="%" delta={`${analysis.changePct > 0 ? '↑' : '↓'} ${Math.abs(analysis.changePct)}%`} deltaTone={analysis.decliningFast ? 'watch' : 'ok'} />
               <MetricValue label="EC" value={analysis.latest.soilEcAvg} unit="mS/cm" />
               <MetricValue label="Soil temp" value={formatTemp(analysis.latest.soilTempAvg, system)} unit={tempUnit(system)} />

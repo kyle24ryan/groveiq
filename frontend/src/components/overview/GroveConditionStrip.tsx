@@ -24,7 +24,7 @@ export function GroveConditionStrip({ latest, regionalAqi, demand, vpd, freshnes
   const batteryKnown = latest?.battery_sensor_array_code != null;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+    <div className="rgrid-4" style={{ gap: 14 }}>
       <ConditionTile
         label="Outdoor"
         value={latest?.outdoor_temp_c != null ? `${formatTemp(latest.outdoor_temp_c, system)}${tempUnit(system)}` : '—'}
