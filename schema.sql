@@ -493,3 +493,16 @@ INSERT OR IGNORE INTO app_settings (key, value) VALUES
   ('owner_name', 'Kyle Ryan'),
   ('location', 'North Bend, WA'),
   ('hardiness_zone', 'USDA 8b');
+
+-- Web Push subscriptions (migration 0012). Single-user app behind
+-- Cloudflare Access, so no per-user linkage -- alerts fan out to every
+-- subscribed browser/device.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id TEXT PRIMARY KEY,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint ON push_subscriptions(endpoint);

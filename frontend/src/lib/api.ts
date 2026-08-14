@@ -227,6 +227,43 @@ export async function withdrawSmsConsent(): Promise<{ ok: boolean; error?: strin
   return { ok: true };
 }
 
+// --- Push notifications ---
+
+export async function fetchVapidPublicKey(): Promise<string> {
+  const res = await apiFetch(`${API_BASE}/push/vapid-public-key`);
+  if (!res.ok) throw new Error(`vapid-public-key failed: ${res.status}`);
+  const body = (await res.json()) as { publicKey: string };
+  return body.publicKey;
+}
+
+export async function subscribePush(subscription: PushSubscriptionJSON): Promise<{ ok: boolean; error?: string }> {
+  const res = await apiFetch(`${API_BASE}/push/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription),
+  });
+  const body = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok) return { ok: false, error: body.error };
+  return { ok: true };
+}
+
+export async function unsubscribePush(endpoint: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await apiFetch(`${API_BASE}/push/unsubscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint }),
+  });
+  const body = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok) return { ok: false, error: body.error };
+  return { ok: true };
+}
+
+export async function sendTestPush(): Promise<{ sent: number; failed: number }> {
+  const res = await apiFetch(`${API_BASE}/push/test`, { method: 'POST' });
+  if (!res.ok) throw new Error(`push test failed: ${res.status}`);
+  return (await res.json()) as { sent: number; failed: number };
+}
+
 // --- Tree profile editing ---
 
 export type TreeProfile = {

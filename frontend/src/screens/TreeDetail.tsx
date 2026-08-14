@@ -82,8 +82,8 @@ export function TreeDetail() {
       const updated = await updateTreeProfile(treeId, draft);
       setProfile(updated);
       setEditing(false);
-    } catch (err) {
-      setSaveError(String(err));
+    } catch {
+      setSaveError("Couldn't save — try again.");
     } finally {
       setSaving(false);
     }
@@ -96,8 +96,8 @@ export function TreeDetail() {
     try {
       const result = await uploadTreePhoto(treeId, file);
       setPhotoAnalyses((prev) => [result, ...prev]);
-    } catch (err) {
-      setUploadError(String(err));
+    } catch {
+      setUploadError('please try again');
     } finally {
       setUploading(false);
     }

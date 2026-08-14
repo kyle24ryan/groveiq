@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/Card';
+import { PushNotificationsCard } from '../components/PushNotificationsCard';
 import {
   fetchConsentText,
   fetchNotificationPreferences,
@@ -50,7 +51,7 @@ export function NotificationSettings() {
           setStep('enter_phone');
         }
       })
-      .catch((err) => setError(String(err)));
+      .catch(() => setError("Couldn't load your notification settings right now — try refreshing the page."));
   }, []);
 
   async function handleSendCode() {
@@ -110,8 +111,10 @@ export function NotificationSettings() {
           ← Settings
         </Link>
         <h1 style={{ fontSize: 24, marginTop: 8 }}>Notification Settings</h1>
-        <p style={{ color: 'var(--ink-soft)', marginTop: 4, fontSize: 14 }}>Manage text message alerts from GroveIQ.</p>
+        <p style={{ color: 'var(--ink-soft)', marginTop: 4, fontSize: 14 }}>Manage push and text message alerts from GroveIQ.</p>
       </div>
+
+      <PushNotificationsCard />
 
       {error && (
         <Card style={{ borderColor: 'var(--urgent)' }}>

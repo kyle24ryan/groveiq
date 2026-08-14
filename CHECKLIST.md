@@ -4,7 +4,46 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-13 (Command + Spatial Intelligence redesign, Phase 1-2 of `docs/GROVEIQ_COMMAND_SPATIAL_REDESIGN_SPEC.md`).
+Last updated: 2026-08-14 (push notifications; error-message audit).
+
+## Push notifications
+
+Item 1 of the original UI/UX backlog, unblocked (unlike Twilio/Mapbox this
+needed no external account -- VAPID is a self-generated key pair):
+
+- Backend: migration `0012_push_notifications.sql` (`push_subscriptions`
+  table), `src/push.ts` (`sendPushToAll`, via `webpush-webcrypto` --
+  pure Web Crypto API, unlike the Node-only `web-push` package, so it runs
+  in Workers; the package ships no TS types, covered by a minimal ambient
+  declaration at `src/types/webpush-webcrypto.d.ts`), `src/routes/push.ts`
+  (vapid-public-key/subscribe/unsubscribe/test endpoints). VAPID keys
+  generated once locally and stored as Worker secrets
+  (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`), not committed anywhere.
+- Wired into `alerts.ts`'s `deliverAlert()`: push fires at both watch and
+  urgent tiers (alongside email) since there's no compliance/consent gate
+  like SMS -- the browser permission prompt already is the opt-in.
+- Frontend: `public/sw.js` (minimal service worker, just push +
+  notificationclick), `components/PushNotificationsCard.tsx` (enable/
+  disable/test-send UI, standalone from the SMS consent flow), wired into
+  `NotificationSettings.tsx` and reflected in Settings.tsx's summary row.
+- Verified: subscribe/unsubscribe DB round-trip via curl, service worker
+  registers and the UI correctly shows the "blocked" state when
+  `Notification.permission` is denied (as it is in this sandboxed test
+  browser). **Not verified**: actual push delivery end-to-end, which needs
+  a real granted-permission browser session -- ask the user to visit
+  Settings → Notification Settings and click "Enable push notifications",
+  then "Send test notification" to confirm.
+
+## Error-message audit (found while verifying push notifications)
+
+Swept the frontend for the same `TypeError: Failed to fetch`-leaking
+pattern already fixed once in Environment.tsx this session (spec 13's
+named anti-pattern) and found four more instances: `Settings.tsx`'s
+ProfileCard (both load and save), `NotificationSettings.tsx`'s initial
+load, `TreeDetail.tsx`'s profile-save and photo-upload handlers, and one
+in the push notifications code I'd just written myself
+(`PushNotificationsCard.tsx`, all three handlers). All now show static,
+friendly messages instead of the raw thrown error.
 
 ## Command + Spatial Intelligence redesign
 
@@ -121,8 +160,8 @@ wrangler deploy` from the repo root.)
 
 ## UI/UX backlog (user feedback 2026-08-13)
 
-1. Push notifications — new delivery channel, no service worker/subscription
-   flow exists yet
+1. [x] Push notifications — see "Push notifications" section above for
+   detail.
 2. [x] Grove's top status strip redesigned as a bordered stat-cell grid
    (was a flat mono dot-joined line); Environment's metric-card grid fixed
    from an uneven 4+1 wrap to a full 3x2 grid (moved the Sun card into the

@@ -17,4 +17,6 @@ export interface Env {
   ALERT_SMS_TO?: string;
   PHONE_ENCRYPTION_KEY?: string;
   PHONE_HASH_KEY?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
 }

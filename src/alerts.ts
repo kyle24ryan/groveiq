@@ -11,6 +11,7 @@ import type { DailyForecast } from './nws';
 import { sendAlertEmail } from './email';
 import { sendOperationalSms } from './sms/sendService';
 import { getPrimaryPhoneContact } from './sms/consent';
+import { sendPushToAll } from './push';
 
 type AlertType = 'wind' | 'heat' | 'aqi' | 'frost' | 'wind_gust_forecast';
 type Source = 'current' | 'forecast';
@@ -18,11 +19,15 @@ type Tier = 'watch' | 'urgent';
 
 type EvalResult = { tier: Tier | null; value: number | null };
 
-// Tiered delivery per SPEC.md 1.5: watch -> email, urgent -> email + SMS,
-// silent on recovery. Only fires on a genuinely new alert (edge-triggered,
-// same as the alerts table itself) -- never on every poll.
+// Tiered delivery per SPEC.md 1.5: watch -> email + push, urgent -> email +
+// push + SMS, silent on recovery. Only fires on a genuinely new alert
+// (edge-triggered, same as the alerts table itself) -- never on every
+// poll. Push has no consent/compliance gate like SMS -- the browser
+// permission prompt already is the opt-in, so it fires at both tiers like
+// email rather than being reserved for urgent only.
 async function deliverAlert(env: Env, tier: Tier, message: string): Promise<void> {
   await sendAlertEmail(env, `GroveIQ ${tier} alert`, message);
+  await sendPushToAll(env, { title: `GroveIQ ${tier} alert`, body: message, url: '/' });
 
   if (tier !== 'urgent') return;
 

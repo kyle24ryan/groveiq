@@ -133,13 +133,13 @@ export function Settings() {
           Notifications
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13.5 }}>
-          <NotificationRow tier="Watch alerts" tone="watch" channels={{ email: true, push: false, sms: false }} />
-          <NotificationRow tier="Attention alerts" tone="urgent" channels={{ email: true, push: false, sms: true }} />
+          <NotificationRow tier="Watch alerts" tone="watch" channels={{ email: true, push: true, sms: false }} />
+          <NotificationRow tier="Attention alerts" tone="urgent" channels={{ email: true, push: true, sms: true }} />
           <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
-            Email is live. SMS is built and consent-gated — delivery is pending Twilio's A2P 10DLC campaign approval.
+            Email and push are live. SMS is built and consent-gated — delivery is pending Twilio's A2P 10DLC campaign approval.
           </p>
           <Link to="/settings/notifications" style={{ fontSize: 13, color: 'var(--insight)', marginTop: 4 }}>
-            Manage text message alerts →
+            Manage push & text message alerts →
           </Link>
         </div>
       </Card>
@@ -247,8 +247,8 @@ function ProfileCard() {
       .then((s) => {
         if (!cancelled) setSettings(s);
       })
-      .catch((err) => {
-        if (!cancelled) setError(String(err));
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load profile settings right now.");
       });
     return () => {
       cancelled = true;
@@ -268,8 +268,8 @@ function ProfileCard() {
       const updated = await updateAppSettings(draft);
       setSettings(updated);
       setEditing(false);
-    } catch (err) {
-      setError(String(err));
+    } catch {
+      setError("Couldn't save — try again.");
     } finally {
       setBusy(false);
     }
