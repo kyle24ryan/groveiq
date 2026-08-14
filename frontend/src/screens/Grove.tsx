@@ -71,40 +71,32 @@ export function Grove() {
         </p>
       </div>
 
-      <div
-        className="mono"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 8,
-          fontSize: 13,
-          alignItems: 'center',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          padding: '10px 16px',
-        }}
-      >
-        <span>{trees.length} trees</span>
-        <Divider />
-        <span className="status-ok">{counts.ok} healthy</span>
-        <Divider />
-        <span className="status-watch">{counts.watch} watch</span>
-        <Divider />
-        <span className="status-urgent">{counts.urgent} attention</span>
-        <Divider />
-        <span>{latest?.outdoor_temp_c != null ? `${formatTemp(latest.outdoor_temp_c, system)}${tempUnit(system)}` : '—'}</span>
-        <Divider />
-        <span>{latest?.humidity_pct != null ? `${latest.humidity_pct}% RH` : '—'}</span>
-        <Divider />
-        <span>PM2.5 {latest?.pm25 ?? '—'}</span>
-        <Divider />
-        <span>{latest?.rain_in === 0 || latest?.rain_in == null ? 'No rain' : `${formatRain(latest.rain_in, system)}${rainUnit(system)} rain`}</span>
-        <Divider />
-        <span className={`status-${freshness.stale ? 'watch' : 'ok'}`} style={{ fontSize: 11 }}>
-          {freshness.label}
-        </span>
-      </div>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Trees', value: trees.length },
+            { label: 'Healthy', value: counts.ok, tone: 'ok' as const },
+            { label: 'Watch', value: counts.watch, tone: 'watch' as const },
+            { label: 'Attention', value: counts.urgent, tone: 'urgent' as const },
+          ].map((stat) => (
+            <StatCell key={stat.label} {...stat} borderRight />
+          ))}
+          <div style={{ width: 1, background: 'var(--border)', margin: '10px 0' }} />
+          {[
+            { label: 'Outdoor', value: latest?.outdoor_temp_c != null ? `${formatTemp(latest.outdoor_temp_c, system)}${tempUnit(system)}` : '—' },
+            { label: 'Humidity', value: latest?.humidity_pct != null ? `${latest.humidity_pct}%` : '—' },
+            { label: 'PM2.5', value: latest?.pm25 ?? '—' },
+            { label: 'Rain', value: latest?.rain_in === 0 || latest?.rain_in == null ? 'None' : `${formatRain(latest.rain_in, system)}${rainUnit(system)}` },
+          ].map((stat, i, arr) => (
+            <StatCell key={stat.label} {...stat} borderRight={i < arr.length - 1} />
+          ))}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', padding: '0 18px' }}>
+            <span className={`status-${freshness.stale ? 'watch' : 'ok'}`} style={{ fontSize: 11 }}>
+              {freshness.label}
+            </span>
+          </div>
+        </div>
+      </Card>
 
       <AlertBanner />
 
@@ -134,6 +126,31 @@ export function Grove() {
   );
 }
 
-function Divider() {
-  return <span style={{ color: 'var(--border-strong)' }}>·</span>;
+function StatCell({
+  label,
+  value,
+  tone,
+  borderRight,
+}: {
+  label: string;
+  value: string | number;
+  tone?: Status;
+  borderRight?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        flex: '1 1 92px',
+        padding: '14px 18px',
+        borderRight: borderRight ? '1px solid var(--border)' : 'none',
+      }}
+    >
+      <div className="eyebrow" style={{ fontSize: 11 }}>
+        {label}
+      </div>
+      <div className={`mono ${tone ? `status-${tone}` : ''}`} style={{ fontSize: 19, fontWeight: 600, marginTop: 4 }}>
+        {value}
+      </div>
+    </div>
+  );
 }
