@@ -19,8 +19,16 @@ been flashed or tested.
 
 ## Setup
 
-1. Install [PlatformIO](https://platformio.org/) (VS Code extension or CLI).
-2. `cp include/secrets_template.h include/secrets.h` and fill in:
+Two ways to build and flash this firmware — pick one. The source of truth
+is `src/main.cpp` + `include/*.h` (PlatformIO layout); the Arduino IDE path
+below flashes from a generated copy of the same code, see
+`arduino_sketch/README.md` for details.
+
+Either way, first:
+
+1. `cp include/secrets_template.h include/secrets.h` (PlatformIO) — or
+   `cp arduino_sketch/irrigation/secrets_template.h
+   arduino_sketch/irrigation/secrets.h` (Arduino IDE) — and fill in:
    - WiFi credentials
    - `IRRIGATION_DEVICE_KEY` (must match the Worker secret — ask if you
      don't have it, or generate a new one and update both sides with
@@ -33,13 +41,24 @@ been flashed or tested.
      the same way as `scripts/camera-capture/README.md` step 4 describes.
      This service token is what actually gates the endpoint at Cloudflare's
      edge; `CAMERA_DEVICE_KEY` is a second, Worker-side check.
-3. Confirm `include/pins.h` against the actual ESP32-S3 DevKitC-1 terminal
-   breakout board's silkscreen before wiring anything — the pin numbers in
-   this repo are placeholders.
-4. In the Reolink app, set one PTZ preset per tree and make sure the preset
+2. Confirm `include/pins.h` (or `arduino_sketch/irrigation/pins.h` — keep
+   both in sync) against the actual ESP32-S3 DevKitC-1 terminal breakout
+   board's silkscreen before wiring anything — the pin numbers in this repo
+   are placeholders.
+3. In the Reolink app, set one PTZ preset per tree and make sure the preset
    numbers match `include/tree_presets.h` (there's no runtime config file
    on-device — edit that header directly if preset numbers change).
+
+### Option A: PlatformIO
+
+4. Install [PlatformIO](https://platformio.org/) (VS Code extension or CLI).
 5. `pio run -t upload` to flash, `pio device monitor` to watch serial output.
+
+### Option B: Arduino IDE
+
+See `arduino_sketch/README.md` for the full walkthrough (board package,
+board settings for the N16R8's 16MB flash / octal PSRAM, library install,
+flashing, and serial monitor).
 
 ## Safety model
 

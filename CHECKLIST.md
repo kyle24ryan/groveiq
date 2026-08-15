@@ -41,6 +41,18 @@ Also switched the device-facing capture endpoints from a Cloudflare Access
 Worker's own key check) to an **Access Service Token**, on explicit user
 request ("I dont want an open endpoint").
 
+**Arduino IDE build path added** (same day): since no PlatformIO toolchain
+was available to even compile-check the firmware, added
+`firmware/irrigation/arduino_sketch/` — a generated, flattened copy of
+`src/`+`include/` in the single-folder layout Arduino IDE requires (main
+file renamed `.ino`, no subfolders). PlatformIO's `src/main.cpp` +
+`include/*.h` remains the source of truth; the Arduino copy is regenerated
+by hand (steps in `arduino_sketch/README.md`) when the source changes.
+Full board-settings walkthrough included there — notably the N16R8 module
+needs **Flash Size 16MB** + **PSRAM: OPI PSRAM** set explicitly in Arduino
+IDE's Tools menu (PlatformIO's board definition sets these automatically),
+or `ps_malloc()` in the camera task's snapshot buffer silently fails.
+
 ## Push notifications
 
 Item 1 of the original UI/UX backlog, unblocked (unlike Twilio/Mapbox this

@@ -6,6 +6,7 @@ dist/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 firmware/**/include/secrets.h
+firmware/**/arduino_sketch/**/secrets.h
 firmware/**/.pio/
 .cf-access-service-token
 scripts/camera-capture/config.json
