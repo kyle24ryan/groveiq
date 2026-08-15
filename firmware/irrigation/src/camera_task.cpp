@@ -275,7 +275,14 @@ void checkForAutoCapture() {
 }
 
 void cameraTaskLoop(void*) {
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  // configTzTime (not plain configTime, which was previously called with a
+  // 0 UTC offset -- a real bug: kAutoCaptureHour's "local time" comment was
+  // wrong, it was actually firing at 10:00 UTC = 3am Pacific, not 10am).
+  // This POSIX TZ string is America/Los_Angeles (PST8PDT) with the current
+  // US DST transition rule, so localtime_r() below matches the grove's
+  // real location (North Bend, WA) and handles the PST/PDT switch
+  // automatically, without needing a firmware update twice a year.
+  configTzTime("PST8PDT,M3.2.0,M11.1.0", "pool.ntp.org", "time.nist.gov");
   log("camera task started on core " + String(xPortGetCoreID()));
 
   for (;;) {
