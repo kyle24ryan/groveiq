@@ -349,13 +349,25 @@ until the probes show up.
       - **Not verified live**: the device-facing endpoints
         (`/api/v1/capture/command` etc.) currently return the Cloudflare
         Access login redirect (302) rather than reaching the Worker's own
-        auth check — confirmed by curl. They need an Access "Bypass"
-        policy added (same as `/privacy`/`/terms`/the Twilio webhook),
-        which is a Zero Trust dashboard change only the user can do — see
-        `scripts/camera-capture/README.md` step 4. **This same gap likely
-        applies to the irrigation ESP32's endpoints too** — worth
-        checking before that firmware ever gets flashed, since it would
-        hit the identical problem.
+        auth check — confirmed by curl. Deliberately *not* using a
+        "Bypass" policy here (that would leave the path open at Cloudflare's
+        edge with only the Worker's `X-Camera-Key` check standing between
+        it and the internet) — instead using a **Cloudflare Access
+        Service Token** (`CF-Access-Client-Id`/`-Secret`, already wired
+        into `capture.mjs`'s `deviceHeaders()`), so Access itself still
+        authenticates every request at the edge. Creating the token and
+        its Access policy is a Zero Trust dashboard change only the user
+        can do — see `scripts/camera-capture/README.md` step 4. **This
+        same gap likely applies to the irrigation ESP32's endpoints
+        too** — worth setting up the same way before that firmware ever
+        gets flashed, since it would hit the identical problem.
+      - **Bench-tested independently of this backend** (2026-08-14): the
+        user ran a standalone sketch on the ESP32-S3 confirming it can
+        reach the Reolink's local snapshot API directly and stream a full
+        488KB JPEG in 1.3s with 8.3MB PSRAM still free afterward —
+        answers the memory-feasibility question from the earlier
+        ESP32-vs-Mac architecture discussion, independent of which device
+        ends up running the production capture logic.
       - `CAMERA_DEVICE_KEY` Worker secret generated and set.
 - [x] Email alert delivery (Resend) — live, watch+urgent tiers
 - [x] SMS consent/verification flow — confirmed working end-to-end live:

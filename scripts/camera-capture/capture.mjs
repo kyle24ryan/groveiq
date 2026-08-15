@@ -29,6 +29,24 @@ function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
+// Auth for every request to the Worker's device-facing /api/v1/capture/*
+// endpoints: a Cloudflare Access Service Token (CF-Access-Client-Id/
+// -Secret) gates the request at Cloudflare's edge before the Worker ever
+// runs -- requests without a valid token never reach the Worker at all.
+// X-Camera-Key is kept as a second, Worker-side check (defense in depth,
+// costs nothing since it was already built) but the Service Token is the
+// real gate now, not a bypass. See README.md's Cloudflare Access setup
+// step for how the token/policy are created -- that's a Zero Trust
+// dashboard change, not something this script can do for itself.
+function deviceHeaders(extra = {}) {
+  return {
+    'X-Camera-Key': config.cameraDeviceKey,
+    'CF-Access-Client-Id': config.cfAccessClientId,
+    'CF-Access-Client-Secret': config.cfAccessClientSecret,
+    ...extra,
+  };
+}
+
 async function reolinkLogin() {
   const res = await fetch(`http://${config.cameraIp}/cgi-bin/api.cgi?cmd=Login`, {
     method: 'POST',
@@ -62,7 +80,7 @@ async function uploadToGroveIQ(treeId, bytes, contentType, source, requestId) {
   if (requestId) qs.set('request_id', requestId);
   const res = await fetch(`${config.workerBaseUrl}/api/v1/capture/upload/${treeId}?${qs}`, {
     method: 'POST',
-    headers: { 'Content-Type': contentType, 'X-Camera-Key': config.cameraDeviceKey },
+    headers: deviceHeaders({ 'Content-Type': contentType }),
     body: bytes,
   });
   const data = await res.json();
@@ -117,7 +135,7 @@ async function runWatch() {
   for (;;) {
     try {
       const res = await fetch(`${config.workerBaseUrl}/api/v1/capture/command`, {
-        headers: { 'X-Camera-Key': config.cameraDeviceKey },
+        headers: deviceHeaders(),
       });
       const data = await res.json();
       if (data.action === 'capture') {
@@ -133,7 +151,7 @@ async function runWatch() {
           try {
             await fetch(`${config.workerBaseUrl}/api/v1/capture/fail/${data.request_id}`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Camera-Key': config.cameraDeviceKey },
+              headers: deviceHeaders({ 'Content-Type': 'application/json' }),
               body: JSON.stringify({ error: err.message }),
             });
           } catch {

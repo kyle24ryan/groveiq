@@ -48,21 +48,32 @@ anything; otherwise the app just waits and eventually times out.
    openssl rand -hex 32 | npx wrangler secret put CAMERA_DEVICE_KEY
    ```
    Keep the generated value — it goes in `config.json` too.
-4. **Add a Cloudflare Access "Bypass" policy** for
-   `api.grove-iq.com/api/v1/capture/command` and
-   `api.grove-iq.com/api/v1/capture/upload/*` and
-   `api.grove-iq.com/api/v1/capture/fail/*` — same as the existing
-   bypasses for `/privacy`, `/terms`, and the Twilio webhook. Without
-   this, Access intercepts the request before the Worker's own
-   `X-Camera-Key` check ever runs. This is a Zero Trust dashboard change,
-   not something doable from code. *(Note: this project has never
-   actually confirmed the irrigation ESP32's endpoints have an equivalent
-   bypass either — worth checking that at the same time, since it'll hit
-   the identical problem once that firmware is flashed.)*
+4. **Add a Cloudflare Access Service Token**, not a bypass — a Service
+   Token still requires Access to authenticate every request at
+   Cloudflare's edge (checking a client ID/secret pair), rather than
+   opening the path up and relying solely on the Worker's own
+   `X-Camera-Key` check. This is a Zero Trust dashboard change; the steps
+   below can't be done from code or by me on your behalf:
+   1. **Zero Trust dashboard → Access → Service Auth → Service Tokens →
+      Create Service Token.** Name it something like `groveiq-camera`.
+      Cloudflare shows the **Client ID** and **Client Secret** exactly
+      once — copy both immediately, they go in `config.json` in step 5.
+   2. **Access → Applications** — create (or reuse, if one already
+      covers `api.grove-iq.com`) a self-hosted Access Application whose
+      path covers `api.grove-iq.com/api/v1/capture/*`.
+   3. Add a policy to that application: **Action: Service Auth**,
+      **Include: Valid Service Token** → select the token from step 1.
+   Once this is live, a request to that path with a valid
+   `CF-Access-Client-Id`/`CF-Access-Client-Secret` pair reaches the
+   Worker as normal; anything else gets Access's standard block page —
+   the endpoint is never actually open. *(Note: this project has never
+   confirmed the irrigation ESP32's endpoints have equivalent protection
+   either — worth setting up the same way before that firmware gets
+   flashed, since it hits the identical problem.)*
 5. `cp config.example.json config.json` and fill in the camera IP,
-   credentials, the device key from step 3, and the tree→preset mapping
-   from step 2. `config.json` is gitignored — never commit your filled-in
-   copy.
+   credentials, the device key from step 3, the Service Token client
+   ID/secret from step 4, and the tree→preset mapping from step 2.
+   `config.json` is gitignored — never commit your filled-in copy.
 6. **Test the camera connection directly** before trusting the script:
    ```bash
    curl -X POST "http://<camera-ip>/cgi-bin/api.cgi?cmd=Login" \

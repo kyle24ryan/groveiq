@@ -4,6 +4,8 @@
   "cameraPassword": "REPLACE_ME",
   "workerBaseUrl": "https://api.grove-iq.com",
   "cameraDeviceKey": "REPLACE_ME",
+  "cfAccessClientId": "REPLACE_ME_WITH_SERVICE_TOKEN_CLIENT_ID",
+  "cfAccessClientSecret": "REPLACE_ME_WITH_SERVICE_TOKEN_CLIENT_SECRET",
   "settleMs": 2500,
   "watchPollMs": 15000,
   "treePresets": {
