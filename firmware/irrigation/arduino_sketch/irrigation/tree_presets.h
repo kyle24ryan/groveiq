@@ -18,9 +18,9 @@ struct TreePreset {
 };
 
 inline const TreePreset kTreePresets[] = {
-  {"silver-fir", 0},
-  {"yellow-cedar-1", 1},
-  {"yellow-cedar-2", 2},
+  {"yellow-cedar-1", 0},
+  {"yellow-cedar-2", 1},
+  {"silver-fir", 2},
   {"dawn-redwood", 3},
   {"mountain-hemlock", 4}
 };
