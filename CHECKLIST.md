@@ -461,7 +461,15 @@ until the probes show up.
 - [ ] **SMS actual delivery** — blocked purely on Twilio's A2P 10DLC
       campaign review (external, out of our hands). First live OTP test hit
       error 30034 (unregistered number) before the user submitted
-      Brand+Campaign registration for `+14147683470`.
+      Brand+Campaign registration for `+14147683470`. First campaign
+      submission then got rejected (error 30909 — insufficient opt-in
+      detail); resubmitted 2026-08-15 with a full field-by-field
+      description of the real 3-step opt-in flow, verified against actual
+      code. Also added a real opt-in confirmation SMS
+      (`OPT_IN_CONFIRMATION_TEXT` in `sms/policyVersions.ts`) that didn't
+      exist before — surfaced as a genuine gap while answering the
+      resubmission form's "what is the opt-in message?" field, since the
+      OTP message explicitly disclaims enrolling anyone.
 - [x] Cloudflare Access bypass for `/privacy`, `/terms`, and the Twilio
       webhook path — all three added and verified (public pages return 200
       with no login; webhook reaches the Worker's own signature check

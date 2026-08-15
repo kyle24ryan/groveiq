@@ -5,7 +5,7 @@ actually built, per section 19.8's instruction to provide this table.
 Structured against section 17's pre-submission checklist since that's
 already the most actionable format in the source doc.
 
-Last updated: 2026-08-13.
+Last updated: 2026-08-15.
 
 ## Policies and public evidence
 
@@ -27,6 +27,7 @@ Last updated: 2026-08-13.
 | User can continue without SMS consent | ✅ Done | `NotificationSettings.tsx` | Verification proceeds regardless of checkbox state; consent event only recorded if checked (`routes/notifications.ts` `handleVerificationStart`) |
 | Disclosure copy matches approved version, visible at consent time | ✅ Done | `sms/policyVersions.ts`, fetched via `/api/v1/sms/consent-text` | Single source of truth — frontend never hardcodes its own copy, so displayed and recorded text can't drift |
 | Phone verification distinct from consent | ✅ Done | `sms/otp.ts`, `routes/notifications.ts` | Verifying does not itself grant consent; only promotes an already-pending `granted` event to `active` |
+| Literal opt-in confirmation message sent | ✅ Done (2026-08-15) | `sms/policyVersions.ts` `OPT_IN_CONFIRMATION_TEXT`, sent from `routes/notifications.ts` `handleVerificationConfirm` | Was a real gap until now — the OTP message explicitly says it does *not* enroll the user, and nothing else sent a confirmation. Fires once, right after verification completes with consent active, via `sendSms()` directly (not category-gated — no category is enabled yet at this point) |
 | All categories default Off | ✅ Done | migration `0009_sms_compliance.sql` (`sms_category_subscriptions`), `NotificationSettings.tsx` | No row = disabled, `authorizeOperationalSend` treats missing row as `category_disabled` |
 | Phone change invalidates prior verification/subscriptions | ⚠️ Partial | `sms/consent.ts` `getOrCreatePhoneContact` | A new number creates a new `phone_contacts` row (correctly starts unverified/no subscriptions) — but there's no UI flow yet for *changing* an already-verified number; today the only path is verifying a fresh number |
 | Accessibility review | ❌ Not done | — | Standard HTML form elements (real `<input type="checkbox">`, labels wrapping inputs) but no formal a11y audit performed |
@@ -49,19 +50,21 @@ Last updated: 2026-08-13.
 
 | Item | Status | Notes |
 |---|---|---|
-| Production traffic uses a registered A2P campaign | ⏳ In progress | User submitted Brand + Campaign registration for `+14147683470` (chose full 10DLC over Toll-Free) — awaiting Twilio review |
+| Production traffic uses a registered A2P campaign | ⏳ In progress, 1 rejection so far | First submission rejected (error 30909 — Message Flow/Call to Action didn't give reviewers enough opt-in detail). Resubmitted 2026-08-15 with a full field-by-field description of the real 3-step opt-in flow, matching what's actually in code |
 | STOP/HELP/START tested end-to-end from a real handset | ❌ Blocked | Can't test until campaign approves (unregistered number is carrier-blocked, confirmed via Twilio error 30034 on the first live OTP test) |
-| Campaign content matches production behavior | ✅ Should match | Message flow/sample messages used in registration should mirror `sms/policyVersions.ts` and the actual OTP/alert templates in `sms/otp.ts` and `alerts.ts` — **user assembled the actual submission, not verified against this table line-by-line** |
-| `PrivacyPolicyUrl`/`TermsAndConditionsUrl` populated | ✅ Done, but see blocker above | Submitted as `https://grove-iq.com/privacy` / `/terms` — **these currently 302 to an Access login page**; needs the bypass policy before/for Twilio's re-check, if any |
+| Campaign content matches production behavior | ✅ Verified against code 2026-08-15 | Sample messages for resubmission pulled directly from `sms/otp.ts`, `sms/policyVersions.ts` (including the new `OPT_IN_CONFIRMATION_TEXT`), and `alerts.ts` — not just assumed to match |
+| `PrivacyPolicyUrl`/`TermsAndConditionsUrl` populated | ✅ Done | `https://grove-iq.com/privacy` / `/terms` — confirmed live via curl 2026-08-15, both return a clean `200` (redirects to trailing-slash form, no Access login block) |
+| Opt-out/Help auto-reply text matches Twilio's Advanced Opt-Out config | ⚠️ Unverified | The app sends empty TwiML for STOP/HELP — actual reply text is whatever's configured in Twilio Console → Messaging → Advanced Opt-Out. **Not cross-checked against what was entered in the campaign form's Opt-Out Message / Help Message fields** — verify these match before submitting |
 
 ## Definition of done — current state
 
 Per section 18: **not done yet.** Concretely blocking:
-1. Cloudflare Access bypass for `/privacy`, `/terms`, and the Twilio webhook path (dashboard config, user's action, verification pending)
-2. Twilio A2P 10DLC campaign approval (external, Twilio's timeline)
+1. ~~Cloudflare Access bypass for `/privacy`, `/terms`~~ — resolved, both confirmed returning `200` live 2026-08-15
+2. Twilio A2P 10DLC campaign approval (external, Twilio's timeline) — 1 rejection (30909), resubmitted 2026-08-15
 3. Handset-level STOP/HELP/START test (blocked by #2)
 4. Legal review of Privacy Policy / Terms content (explicitly required by the source doc's own front matter before real production launch)
 5. Accessibility audit (not started)
 6. Phone-number-change UI flow (not built)
+7. Cross-check Twilio Advanced Opt-Out's configured STOP/HELP reply text against what was entered in the campaign form (see table above)
 
 Everything else — the technical consent/verification/send/webhook system — is built and internally consistent with the spec.
