@@ -54,7 +54,7 @@ Respond with ONLY a JSON object, no markdown fences, no other text:
     },
     body: JSON.stringify({
       model: VISION_MODEL,
-      max_tokens: 500,
+      max_tokens: 1024,
       messages: [
         {
           role: 'user',
@@ -72,7 +72,7 @@ Respond with ONLY a JSON object, no markdown fences, no other text:
     throw new Error(`Anthropic API returned ${response.status}: ${errText}`);
   }
 
-  const body = (await response.json()) as { content: { type: string; text?: string }[] };
+  const body = (await response.json()) as { content: { type: string; text?: string }[]; stop_reason?: string };
   const textBlock = body.content.find((b) => b.type === 'text');
   if (!textBlock?.text) {
     throw new Error('No text content in vision analysis response');
@@ -88,7 +88,8 @@ Respond with ONLY a JSON object, no markdown fences, no other text:
   try {
     parsed = JSON.parse(jsonText) as VisionAnalysis;
   } catch {
-    throw new Error(`Vision response wasn't valid JSON: ${jsonText.slice(0, 200)}`);
+    const truncated = body.stop_reason === 'max_tokens' ? ' (response was cut off at max_tokens)' : '';
+    throw new Error(`Vision response wasn't valid JSON${truncated}: ${jsonText.slice(0, 200)}`);
   }
 
   if (!['ok', 'watch', 'urgent'].includes(parsed.status) || !parsed.summary || !parsed.detail) {

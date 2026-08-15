@@ -4,7 +4,7 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-14 (ESP32 camera-capture firmware; Access Service Token; secret-rotation incident).
+Last updated: 2026-08-15 (ESP32 camera-capture firmware verified live on real hardware).
 
 ## ESP32 camera-capture firmware + security incident (2026-08-14)
 
@@ -21,10 +21,32 @@ this firmware had never been flashed, so it was never caught).
 
 Call shapes (Reolink login/PTZ/snapshot, Worker upload/fail) match a
 standalone bench-test sketch the user ran successfully against real
-hardware (200 response, full pipeline verified end-to-end). The production
-`camera_task.cpp` integration itself has **not** been compiled, flashed, or
-run — no PlatformIO toolchain available in this environment to verify a
-build.
+hardware (200 response, full pipeline verified end-to-end).
+
+**Update 2026-08-15: production firmware verified live on real hardware.**
+Flashed via the Arduino IDE build path (below) — WiFi connect → Reolink
+login → PTZ move to preset → snapshot → upload → Worker → vision analysis,
+full round trip over the "Capture now" in-app request, `HTTP 200`,
+`analysis_id` returned. Two real bugs found and fixed during bring-up:
+- `camera_task.cpp` was missing `#include <WiFi.h>` (used `WiFiClient`/
+  `WiFi.status()`/`WL_CONNECTED` directly but only included
+  `WiFiClientSecure.h`, which doesn't transitively pull in the full header
+  on the current esp32 Arduino core) — compile-time failure, first real
+  feedback this firmware had ever gotten.
+- `src/claude.ts`'s vision analysis (`analyzeTreePhoto()`) had
+  `max_tokens: 500`, too tight for the JSON response shape — the model's
+  `detail` field got cut off mid-sentence, producing invalid JSON and a
+  502 on the capture endpoint. Raised to 1024, and the JSON-parse-failure
+  error now reports when `stop_reason` was `max_tokens` so a future
+  regression is diagnosable from the error message alone.
+- Also added boot/WiFi-connect/60s-heartbeat `Serial.println` logging to
+  `main.cpp` — the irrigation loop previously had zero output on the happy
+  path, which looked identical to a hang during bring-up.
+
+**Known follow-up, not a bug**: two consecutive live captures of
+`silver-fir` came back "no clear view of the tree" from the vision model
+(one showed a deck/planter, not foliage) — likely the Reolink preset for
+that tree needs re-aiming, not a software issue.
 
 **Security incident during this work, fixed same session**: a bench-test
 sketch was briefly committed to the (public) `kyle24ryan/groveiq` repo
@@ -441,8 +463,11 @@ still blocked on Phase 1 hardware.
       end-to-end against live D1
 - [x] ESP32 firmware scaffolded (PlatformIO), now including the
       camera-capture task (see "ESP32 camera-capture firmware" section
-      above) — **written but never flashed or run on real hardware**; pin
-      assignments unconfirmed against the actual board
+      above). **Camera-capture task flashed and verified live on real
+      hardware 2026-08-15** (full pipeline, HTTP 200). **Irrigation logic
+      itself (valve control, flow-sensor cross-check) is still
+      unflashed/untested** — pin assignments unconfirmed against the
+      actual board, no valve/flow-sensor hardware wired up yet
 - [ ] Physical valve/drip install, local safety logic verified on real
       hardware — not done, needs the ESP32 physically wired up
 - [ ] Comparative insights, dormancy mode — not started (depends on

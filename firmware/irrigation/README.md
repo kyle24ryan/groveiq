@@ -4,18 +4,18 @@ ESP32-S3 firmware for the Smart Irrigation Module described in SPEC.md
 section 1.12. Talks to the Worker over the API contract in
 `docs/irrigation-api.md`.
 
-**Status: untested skeleton.** Written against the documented BOM and API
-contract, but never flashed to real hardware. Verify pin assignments,
-DRV8871 pulse polarity, and timing constants on the bench before trusting
-it near an actual valve.
+**Status: irrigation logic untested, camera-capture verified live.**
+Irrigation itself (valve control, flow-sensor cross-check) is written
+against the documented BOM and API contract but never flashed to real
+hardware — verify pin assignments, DRV8871 pulse polarity, and timing
+constants on the bench before trusting it near an actual valve.
 
 This board also runs the camera-capture task (see below) — same physical
 ESP32-S3, isolated onto its own FreeRTOS task on core 0 so a slow camera or
-network call can never delay the irrigation safety loop on core 1. The
-camera-relay call shapes were proven live against real hardware via a
-separate bench-test sketch (`scripts/camera-capture/esp32-bench-test/`);
-`camera_task.cpp` itself, running as part of this firmware, has not yet
-been flashed or tested.
+network call can never delay the irrigation safety loop on core 1. **This
+part has been flashed and verified end-to-end on real hardware** (2026-08-15,
+via the Arduino IDE build): WiFi connect → Reolink login → PTZ move →
+snapshot → upload → Worker → vision analysis, full round trip, HTTP 200.
 
 ## Setup
 
