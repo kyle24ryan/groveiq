@@ -16,7 +16,9 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 
+#include "camera_task.h"
 #include "pins.h"
 #include "secrets.h"
 
@@ -70,10 +72,24 @@ bool connectWifi() {
   return wifiConnected();
 }
 
+// A fresh WiFiClientSecure per call. setInsecure() skips certificate
+// validation -- historically this codebase called HTTPClient::begin() on
+// an https:// URL with no certificate handling at all, which very likely
+// fails the TLS handshake once actually flashed (never caught because
+// this firmware has never run on real hardware). setInsecure() is a
+// stopgap, not a long-term production posture; proper fix is pinning
+// Cloudflare's root CA via setCACert() here and in camera_task.cpp.
+WiFiClientSecure secureClient() {
+  WiFiClientSecure client;
+  client.setInsecure();
+  return client;
+}
+
 // Returns true if the JSON body was parsed into `doc`.
 bool httpGetJson(const String& path, JsonDocument& doc) {
+  WiFiClientSecure client = secureClient();
   HTTPClient http;
-  http.begin(String(API_BASE_URL) + path);
+  http.begin(client, String(API_BASE_URL) + path);
   http.addHeader("X-Device-Key", DEVICE_KEY);
 
   int status = http.GET();
@@ -87,8 +103,9 @@ bool httpGetJson(const String& path, JsonDocument& doc) {
 }
 
 bool httpPostJson(const String& path, const JsonDocument& body, bool withDeviceKey) {
+  WiFiClientSecure client = secureClient();
   HTTPClient http;
-  http.begin(String(API_BASE_URL) + path);
+  http.begin(client, String(API_BASE_URL) + path);
   http.addHeader("Content-Type", "application/json");
   if (withDeviceKey) http.addHeader("X-Device-Key", DEVICE_KEY);
 
@@ -181,8 +198,9 @@ void handleManualButton() {
   reqBody["duration_sec"] = kDefaultManualDurationSec;
   reqBody["trigger_source"] = "manual";
 
+  WiFiClientSecure client = secureClient();
   HTTPClient http;
-  http.begin(String(API_BASE_URL) + "/water");
+  http.begin(client, String(API_BASE_URL) + "/water");
   http.addHeader("Content-Type", "application/json");
   String payload;
   serializeJson(reqBody, payload);
@@ -228,6 +246,10 @@ void setup() {
   if (!connectWifi()) {
     Serial.println("WiFi connect failed at boot — will keep retrying in loop()");
   }
+
+  // Runs on core 0, entirely separate from this loop()'s irrigation safety
+  // logic (core 1) — see camera_task.h for the isolation rationale.
+  startCameraTask();
 }
 
 void loop() {

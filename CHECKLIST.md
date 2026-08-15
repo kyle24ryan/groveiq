@@ -4,7 +4,42 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-14 (push notifications; error-message audit).
+Last updated: 2026-08-14 (ESP32 camera-capture firmware; Access Service Token; secret-rotation incident).
+
+## ESP32 camera-capture firmware + security incident (2026-08-14)
+
+Architecture decision made explicitly by the user: the camera-capture relay
+runs on the **same** ESP32-S3 board as irrigation (not a second device),
+isolated onto its own FreeRTOS task pinned to core 0 so a slow Reolink/
+network call can never delay the irrigation safety loop on core 1 (see
+`firmware/irrigation/README.md`'s "Camera capture task" section for the
+full design). New: `include/camera_task.h`, `src/camera_task.cpp`,
+`include/tree_presets.h` (tree→PTZ-preset table); `main.cpp` now starts the
+task from `setup()` and its own `httpGetJson`/`httpPostJson` were fixed to
+use `WiFiClientSecure` (a real, previously-undiscovered TLS-handling bug —
+this firmware had never been flashed, so it was never caught).
+
+Call shapes (Reolink login/PTZ/snapshot, Worker upload/fail) match a
+standalone bench-test sketch the user ran successfully against real
+hardware (200 response, full pipeline verified end-to-end). The production
+`camera_task.cpp` integration itself has **not** been compiled, flashed, or
+run — no PlatformIO toolchain available in this environment to verify a
+build.
+
+**Security incident during this work, fixed same session**: a bench-test
+sketch was briefly committed to the (public) `kyle24ryan/groveiq` repo
+containing a real `CAMERA_DEVICE_KEY` value instead of a placeholder.
+Fixed: rotated `CAMERA_DEVICE_KEY` via `wrangler secret put`, removed the
+real file from git tracking (kept on disk, gitignored), replaced it with a
+proper `.example` template, and confirmed via repo-wide grep that no other
+tracked file held the old value. The Cloudflare Access Service Token
+secret (typed only in chat, never committed) is lower-priority to rotate —
+the user's call whether to.
+
+Also switched the device-facing capture endpoints from a Cloudflare Access
+"Bypass" policy (would've left them open at the edge, gated only by the
+Worker's own key check) to an **Access Service Token**, on explicit user
+request ("I dont want an open endpoint").
 
 ## Push notifications
 
@@ -346,21 +381,20 @@ until the probes show up.
         specific-tree capture, `--all --auto` for a daily launchd job,
         and `--watch` (long-running, services the app's new "Capture
         now" button in Tree Detail by polling the request queue).
-      - **Not verified live**: the device-facing endpoints
-        (`/api/v1/capture/command` etc.) currently return the Cloudflare
-        Access login redirect (302) rather than reaching the Worker's own
-        auth check — confirmed by curl. Deliberately *not* using a
-        "Bypass" policy here (that would leave the path open at Cloudflare's
-        edge with only the Worker's `X-Camera-Key` check standing between
-        it and the internet) — instead using a **Cloudflare Access
-        Service Token** (`CF-Access-Client-Id`/`-Secret`, already wired
-        into `capture.mjs`'s `deviceHeaders()`), so Access itself still
-        authenticates every request at the edge. Creating the token and
-        its Access policy is a Zero Trust dashboard change only the user
-        can do — see `scripts/camera-capture/README.md` step 4. **This
-        same gap likely applies to the irrigation ESP32's endpoints
-        too** — worth setting up the same way before that firmware ever
-        gets flashed, since it would hit the identical problem.
+      - Device-facing endpoints (`/api/v1/capture/command` etc.) are gated
+        by a **Cloudflare Access Service Token**
+        (`CF-Access-Client-Id`/`-Secret`) rather than a "Bypass" policy —
+        Access itself authenticates every request at the edge, not just
+        the Worker's own `X-Camera-Key` check. Wired into both
+        `capture.mjs`'s `deviceHeaders()` and the ESP32 firmware's
+        `camera_task.cpp`. Creating the token and its Access policy was a
+        Zero Trust dashboard change the user did.
+      - **Architecture decision (2026-08-14)**: rather than the Mac script
+        being the production path, the user chose to run capture logic on
+        the irrigation ESP32-S3 directly (same board, FreeRTOS-isolated —
+        see the "ESP32 camera-capture firmware" section above). The Mac
+        script (`scripts/camera-capture/`) remains as a working, bench-
+        verified fallback/reference implementation.
       - **Bench-tested independently of this backend** (2026-08-14): the
         user ran a standalone sketch on the ESP32-S3 confirming it can
         reach the Reolink's local snapshot API directly and stream a full
@@ -393,9 +427,10 @@ still blocked on Phase 1 hardware.
 - [x] Smart Irrigation Module: Worker↔ESP32 API contract designed,
       documented (`docs/irrigation-api.md`), and implemented — tested
       end-to-end against live D1
-- [x] ESP32 firmware scaffolded (PlatformIO) — **written but never flashed
-      or run on real hardware**; pin assignments unconfirmed against the
-      actual board
+- [x] ESP32 firmware scaffolded (PlatformIO), now including the
+      camera-capture task (see "ESP32 camera-capture firmware" section
+      above) — **written but never flashed or run on real hardware**; pin
+      assignments unconfirmed against the actual board
 - [ ] Physical valve/drip install, local safety logic verified on real
       hardware — not done, needs the ESP32 physically wired up
 - [ ] Comparative insights, dormancy mode — not started (depends on
