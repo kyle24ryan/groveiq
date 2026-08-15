@@ -36,7 +36,7 @@
 namespace {
 
 constexpr uint32_t kPollIntervalMs = 15000;   // matches capture.mjs's default watchPollMs
-constexpr uint32_t kSettleMs = 2500;          // time for the camera to finish a PTZ move
+constexpr uint32_t kSettleMs = 5000;          // time for the camera to finish a PTZ move
 constexpr int kAutoCaptureHour = 10;          // local time, matches the Mac launchd default
 constexpr uint32_t kCameraTaskStackBytes = 16384;
 
@@ -87,6 +87,7 @@ bool reolinkLogin(String& tokenOut) {
 }
 
 bool movePreset(const String& token, int presetId) {
+  log("moving to preset " + String(presetId) + "...");
   HTTPClient http;
   http.setTimeout(15000);
   http.begin(String("http://") + CAMERA_IP + "/cgi-bin/api.cgi?cmd=PtzCtrl&token=" + token);
@@ -99,6 +100,7 @@ bool movePreset(const String& token, int presetId) {
     log("PTZ move HTTP " + String(code));
     return false;
   }
+  log("PTZ move response: " + resp);
   JsonDocument doc;
   if (deserializeJson(doc, resp)) return false;
   int resultCode = doc[0]["code"] | -1;
