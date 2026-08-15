@@ -224,6 +224,8 @@ void handleManualButton() {
 
 void setup() {
   Serial.begin(115200);
+  delay(500);  // give the USB CDC host time to attach before the first print
+  Serial.println("GroveIQ irrigation controller booting...");
 
   pinMode(PIN_VALVE_IN1, OUTPUT);
   pinMode(PIN_VALVE_IN2, OUTPUT);
@@ -243,19 +245,28 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(PIN_FLOW_SENSOR), onFlowPulse, RISING);
 
-  if (!connectWifi()) {
+  if (connectWifi()) {
+    Serial.print("WiFi connected, IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
     Serial.println("WiFi connect failed at boot — will keep retrying in loop()");
   }
 
   // Runs on core 0, entirely separate from this loop()'s irrigation safety
   // logic (core 1) — see camera_task.h for the isolation rationale.
   startCameraTask();
+
+  Serial.println("Setup complete, entering loop()");
 }
 
 void loop() {
   if (!wifiConnected()) {
     ensureValveClosed();
-    connectWifi();
+    Serial.println("WiFi disconnected, reconnecting...");
+    if (connectWifi()) {
+      Serial.print("WiFi reconnected, IP: ");
+      Serial.println(WiFi.localIP());
+    }
     delay(1000);
     return;
   }
@@ -266,6 +277,16 @@ void loop() {
   if (millis() - lastPollMs >= kPollIntervalMs) {
     lastPollMs = millis();
     pollForCommand();
+  }
+
+  // Heartbeat so it's visible on the serial monitor that loop() is alive
+  // even when nothing else has happened yet (no button press, no pending
+  // server command) -- otherwise the last line ever printed can be from
+  // setup(), which looks identical to a hang.
+  static uint32_t lastHeartbeatMs = 0;
+  if (millis() - lastHeartbeatMs >= 60000) {
+    lastHeartbeatMs = millis();
+    Serial.println("[irrigation] loop alive, WiFi connected");
   }
 
   delay(50);
