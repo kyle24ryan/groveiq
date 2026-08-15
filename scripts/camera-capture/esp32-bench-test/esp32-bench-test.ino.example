@@ -1,3 +1,8 @@
+// Copy this file to esp32-bench-test.ino (gitignored, matching this
+// repo's secrets_template.h / config.example.json convention) and fill
+// in the REPLACE_ME values there before opening in the Arduino IDE.
+// Never fill in real values in THIS file — it's the tracked template.
+//
 // GroveIQ ESP32 camera-capture bench test — snapshot from the Reolink,
 // upload it through the real Worker pipeline, print the vision-analysis
 // result. This is a ONE-OFF VALIDATION SKETCH, not the production capture
@@ -42,9 +47,10 @@ const char* CAMERA_PASSWORD = "REPLACE_ME";  // re-enter -- see note above
 const char* WORKER_BASE_URL = "https://api.grove-iq.com";
 const char* TREE_ID = "mountain-hemlock";  // change to whichever tree you're testing against
 
-// Matches the CAMERA_DEVICE_KEY Worker secret (already set — see
-// CHECKLIST.md "camera capture" section for this exact value).
-const char* CAMERA_DEVICE_KEY = "565c4c2e25db813d1da2aafc10e288f6d6731ed122a9c8d5551073f6cb7266aa";
+// Must match the CAMERA_DEVICE_KEY Worker secret
+// (wrangler secret put CAMERA_DEVICE_KEY). Never put the real value in
+// this tracked template file — only in your local, gitignored copy.
+const char* CAMERA_DEVICE_KEY = "REPLACE_ME";
 
 // From Cloudflare Zero Trust -> Access -> Service Auth -> Service
 // Tokens. Leave as REPLACE_ME until you've created the token and its

@@ -12,3 +12,4 @@ scripts/camera-capture/config.json
 scripts/camera-capture/*.log
 scripts/camera-capture/*.err
 scripts/camera-capture/*.plist
+scripts/camera-capture/esp32-bench-test/esp32-bench-test.ino
