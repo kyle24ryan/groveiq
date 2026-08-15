@@ -13,6 +13,7 @@ import { convertTemp, formatTemp, tempUnit } from '../lib/units';
 import {
   fetchTreeAnalyses,
   uploadTreePhoto,
+  deleteTreeAnalysis,
   photoUrl,
   fetchTreeProfile,
   updateTreeProfile,
@@ -35,6 +36,9 @@ export function TreeDetail() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState<PhotoAnalysis | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'pending' | 'error'>('idle');
   const [captureError, setCaptureError] = useState<string | null>(null);
@@ -121,6 +125,22 @@ export function TreeDetail() {
     }
   }
 
+  async function handleDeletePhoto(id: number) {
+    if (!treeId) return;
+    if (!window.confirm('Delete this photo and its analysis? This removes the stored image too — it cannot be undone.')) return;
+    setDeletingId(id);
+    setDeleteError(null);
+    try {
+      await deleteTreeAnalysis(treeId, id);
+      setPhotoAnalyses((prev) => prev.filter((a) => a.id !== id));
+      setLightboxPhoto((prev) => (prev?.id === id ? null : prev));
+    } catch {
+      setDeleteError('Delete failed — please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   // "Capture now" doesn't reach the camera directly -- it queues a
   // request the local capture script picks up on its own poll cycle (see
   // scripts/camera-capture/README.md), so this just polls the Worker back
@@ -172,6 +192,15 @@ export function TreeDetail() {
       if (capturePollRef.current) clearTimeout(capturePollRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!lightboxPhoto) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxPhoto(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [lightboxPhoto]);
 
   if (!tree) {
     return (
@@ -415,6 +444,7 @@ export function TreeDetail() {
             {photoAnalyses.map((a) => (
               <div
                 key={a.id}
+                className="photo-thumb"
                 title={a.summary ?? undefined}
                 style={{
                   flex: '0 0 auto',
@@ -427,6 +457,42 @@ export function TreeDetail() {
               >
                 {a.photo_url && (
                   <img src={photoUrl(a.photo_url)} alt={`${tree.name} — ${a.ts}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                )}
+                {a.photo_url && (
+                  <div className="photo-thumb-overlay">
+                    <button
+                      type="button"
+                      onClick={() => setLightboxPhoto(a)}
+                      style={{
+                        fontSize: 11,
+                        padding: '4px 9px',
+                        borderRadius: 999,
+                        border: '1px solid rgba(255,255,255,0.6)',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: '#fff',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePhoto(a.id)}
+                      disabled={deletingId === a.id}
+                      style={{
+                        fontSize: 11,
+                        padding: '4px 9px',
+                        borderRadius: 999,
+                        border: '1px solid rgba(255,255,255,0.6)',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: '#fff',
+                        cursor: deletingId === a.id ? 'default' : 'pointer',
+                        opacity: deletingId === a.id ? 0.6 : 1,
+                      }}
+                    >
+                      {deletingId === a.id ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -459,6 +525,9 @@ export function TreeDetail() {
           )}
           {captureStatus === 'error' && captureError && (
             <p style={{ fontSize: 12, color: 'var(--urgent)', marginTop: 10 }}>Capture failed: {captureError}</p>
+          )}
+          {deleteError && (
+            <p style={{ fontSize: 12, color: 'var(--urgent)', marginTop: 10 }}>{deleteError}</p>
           )}
 
           {photoAnalyses[0] && (
@@ -521,6 +590,82 @@ export function TreeDetail() {
           <Card>
             <p style={{ fontSize: 13.5 }}>{notes}</p>
           </Card>
+        </div>
+      )}
+
+      {lightboxPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setLightboxPhoto(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 200,
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: 10 }}
+          >
+            {lightboxPhoto.photo_url && (
+              <img
+                src={photoUrl(lightboxPhoto.photo_url)}
+                alt={`${tree.name} — ${lightboxPhoto.ts}`}
+                style={{ maxWidth: '90vw', maxHeight: '75vh', objectFit: 'contain', borderRadius: 8, display: 'block' }}
+              />
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {lightboxPhoto.status && <StatusBadge status={lightboxPhoto.status} size="sm" />}
+                <span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                  {lightboxPhoto.ts}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => handleDeletePhoto(lightboxPhoto.id)}
+                  disabled={deletingId === lightboxPhoto.id}
+                  style={{
+                    fontSize: 12,
+                    padding: '5px 12px',
+                    borderRadius: 999,
+                    border: '1px solid rgba(255,255,255,0.5)',
+                    background: 'transparent',
+                    color: '#fff',
+                    cursor: deletingId === lightboxPhoto.id ? 'default' : 'pointer',
+                    opacity: deletingId === lightboxPhoto.id ? 0.6 : 1,
+                  }}
+                >
+                  {deletingId === lightboxPhoto.id ? 'Deleting…' : 'Delete'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLightboxPhoto(null)}
+                  style={{
+                    fontSize: 12,
+                    padding: '5px 12px',
+                    borderRadius: 999,
+                    border: '1px solid rgba(255,255,255,0.5)',
+                    background: 'transparent',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            {lightboxPhoto.detail && (
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>{lightboxPhoto.detail}</p>
+            )}
+          </div>
         </div>
       )}
     </div>

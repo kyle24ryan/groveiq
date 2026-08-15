@@ -197,6 +197,36 @@ input:focus-visible,
   .rgrid-2, .rgrid-3, .rgrid-4 { grid-template-columns: 1fr; }
 }
 
+/* Imagery strip thumbnails (TreeDetail): View/Delete controls revealed on
+   hover or keyboard focus, not shown at rest -- avoids cluttering the
+   default photo-strip look with permanent icon buttons. */
+.photo-thumb {
+  position: relative;
+}
+
+.photo-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.photo-thumb:hover .photo-thumb-overlay,
+.photo-thumb:focus-within .photo-thumb-overlay {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-thumb-overlay {
+    transition: none;
+  }
+}
+
 /* Responsive nav (spec 11): the sidebar is always-visible above 768px.
    Below it, it becomes an off-canvas drawer opened from a top bar —
    Layout.tsx toggles the .open class and renders the top bar / close

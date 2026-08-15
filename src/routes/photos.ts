@@ -118,6 +118,33 @@ type AnalysisRow = {
   ts: string;
 };
 
+// Deletes both sides of a photo analysis: the R2 object and the D1 rows
+// referencing it (analyses, plus any capture_requests pointing at it via
+// analysis_id -- otherwise they'd be left dangling, the same orphan state
+// found and manually cleaned up 2026-08-15 after photos were deleted from
+// R2 directly without a matching D1 cleanup).
+async function handleDeleteAnalysis(env: Env, treeId: string, analysisId: string, headers: HeadersInit): Promise<Response> {
+  const id = Number(analysisId);
+  if (!Number.isInteger(id)) {
+    return Response.json({ error: 'invalid analysis id' }, { status: 400, headers });
+  }
+
+  const row = await env.DB.prepare('SELECT id, photo_r2_key FROM analyses WHERE id = ? AND tree_id = ?')
+    .bind(id, treeId)
+    .first<{ id: number; photo_r2_key: string | null }>();
+  if (!row) {
+    return Response.json({ error: 'analysis not found' }, { status: 404, headers });
+  }
+
+  if (row.photo_r2_key) {
+    await env.PHOTOS.delete(row.photo_r2_key);
+  }
+  await env.DB.prepare('DELETE FROM capture_requests WHERE analysis_id = ?').bind(id).run();
+  await env.DB.prepare('DELETE FROM analyses WHERE id = ?').bind(id).run();
+
+  return Response.json({ ok: true }, { headers });
+}
+
 async function handleListAnalyses(env: Env, treeId: string, headers: HeadersInit): Promise<Response> {
   const { results } = await env.DB.prepare(
     `SELECT id, kind, source, status, summary, detail, model, photo_r2_key, ts FROM analyses WHERE tree_id = ? ORDER BY ts DESC LIMIT 50`
@@ -148,6 +175,11 @@ export async function handlePhotosRoute(request: Request, env: Env, pathname: st
   const analysesMatch = pathname.match(/^\/api\/v1\/trees\/([^/]+)\/analyses$/);
   if (analysesMatch && request.method === 'GET') {
     return handleListAnalyses(env, analysesMatch[1], headers);
+  }
+
+  const deleteAnalysisMatch = pathname.match(/^\/api\/v1\/trees\/([^/]+)\/analyses\/([^/]+)$/);
+  if (deleteAnalysisMatch && request.method === 'DELETE') {
+    return handleDeleteAnalysis(env, deleteAnalysisMatch[1], deleteAnalysisMatch[2], headers);
   }
 
   const photoMatch = pathname.match(/^\/api\/v1\/photos\/(.+)$/);

@@ -85,6 +85,14 @@ export function photoUrl(relativePath: string): string {
   return `${API_ORIGIN}${relativePath}`;
 }
 
+export async function deleteTreeAnalysis(treeId: string, analysisId: number): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/analyses/${analysisId}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error || `delete failed: ${res.status}`);
+  }
+}
+
 // --- Camera capture-request queue (spec: "Capture now" button) ---
 // The Worker can't reach the camera or the local capture script directly
 // (no public IP on the home network), so this just queues a request; a
