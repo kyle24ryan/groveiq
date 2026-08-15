@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/Card';
 import { MetricValue } from '../components/MetricValue';
 import { trees, dailyReadingsFor, milestonesFor, insightFor } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
 import { metricInfo } from '../data/metricInfo';
+import { fetchTreeAnalyses, photoUrl, type PhotoAnalysis } from '../lib/api';
 import type { Status } from '../data/types';
 
 const RANGE_DAYS = 90;
@@ -21,9 +22,37 @@ export function Timeline() {
   const readings = useMemo(() => dailyReadingsFor(treeId, RANGE_DAYS), [treeId]);
   const milestones = useMemo(() => milestonesFor(treeId), [treeId]);
   const [index, setIndex] = useState(readings.length - 1);
+  const [photoAnalyses, setPhotoAnalyses] = useState<PhotoAnalysis[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTreeAnalyses(treeId)
+      .then((analyses) => {
+        if (!cancelled) setPhotoAnalyses(analyses.filter((a) => a.kind === 'vision' && a.photo_url));
+      })
+      .catch(() => {
+        // Falls back to the "no capture yet" placeholder below.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [treeId]);
 
   const tree = trees.find((t) => t.id === treeId)!;
   const reading = readings[Math.min(index, readings.length - 1)];
+
+  // Nearest real photo in time to the scrubbed date, matching this page's
+  // own "imagery, readings, and events... synchronized" framing -- not
+  // just always showing the latest capture regardless of scrub position.
+  const nearestPhoto = useMemo(() => {
+    if (photoAnalyses.length === 0) return null;
+    const targetMs = new Date(reading.date).getTime();
+    return photoAnalyses.reduce((closest, a) => {
+      const aDiff = Math.abs(new Date(a.ts).getTime() - targetMs);
+      const closestDiff = Math.abs(new Date(closest.ts).getTime() - targetMs);
+      return aDiff < closestDiff ? a : closest;
+    });
+  }, [photoAnalyses, reading.date]);
   const moistureInRange = reading.soilMoistureAvg >= tree.soilMoistureThresholdLow && reading.soilMoistureAvg <= tree.soilMoistureThresholdHigh;
   const ecInRange = reading.soilEcAvg <= tree.ecThresholdHigh;
 
@@ -78,22 +107,35 @@ export function Timeline() {
       </div>
 
       <Card>
-        <div
-          style={{
-            aspectRatio: '16 / 9',
-            background: 'var(--canvas)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--ink-faint)',
-            fontSize: 13,
-            marginBottom: 24,
-          }}
-        >
-          No capture yet — image stage will populate once the camera is installed
-        </div>
+        {nearestPhoto?.photo_url ? (
+          <div style={{ marginBottom: 24 }}>
+            <img
+              src={photoUrl(nearestPhoto.photo_url)}
+              alt={`${tree.name} — ${nearestPhoto.ts}`}
+              style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 8, display: 'block' }}
+            />
+            <p style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }} className="mono">
+              Nearest capture: {nearestPhoto.ts}
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              aspectRatio: '16 / 9',
+              background: 'var(--canvas)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--ink-faint)',
+              fontSize: 13,
+              marginBottom: 24,
+            }}
+          >
+            No capture yet — image stage will populate once the camera is installed
+          </div>
+        )}
 
         <div style={{ position: 'relative', marginBottom: 8 }}>
           <div style={{ position: 'relative', height: 14 }}>

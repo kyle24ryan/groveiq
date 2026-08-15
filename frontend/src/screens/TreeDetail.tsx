@@ -440,6 +440,9 @@ export function TreeDetail() {
           </div>
         </div>
         <Card>
+          {photoAnalyses.length === 0 && (
+            <p style={{ fontSize: 12.5, color: 'var(--ink-faint)', padding: '8px 0' }}>No captures yet.</p>
+          )}
           <div style={{ display: 'flex', gap: 10, overflowX: 'auto' }}>
             {photoAnalyses.map((a) => (
               <div
@@ -494,28 +497,6 @@ export function TreeDetail() {
                     </button>
                   </div>
                 )}
-              </div>
-            ))}
-            {Array.from({ length: Math.max(0, 4 - photoAnalyses.length) }).map((_, i) => (
-              <div
-                key={`placeholder-${i}`}
-                style={{
-                  flex: '0 0 auto',
-                  width: 120,
-                  aspectRatio: '4 / 3',
-                  background: 'var(--canvas)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--ink-faint)',
-                  fontSize: 11,
-                  textAlign: 'center',
-                  padding: 8,
-                }}
-              >
-                No capture yet
               </div>
             ))}
           </div>

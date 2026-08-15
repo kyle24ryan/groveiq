@@ -10,6 +10,13 @@ export const OPERATIONAL_CONSENT_TEXT_VERSION = 'v1';
 export const OPERATIONAL_CONSENT_TEXT =
   'Send me GroveIQ SMS/MMS notifications. By checking this box, I agree to receive recurring and event-driven text messages from GroveIQ at the mobile number provided, including plant health, sensor, irrigation, environmental/weather, security, and account alerts that I enable. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is not a condition of purchase or use of GroveIQ. See Terms and Privacy Policy.';
 
+// Sent once, immediately after phone verification completes with consent
+// active (routes/notifications.ts's handleVerificationConfirm) -- the
+// literal opt-in confirmation A2P 10DLC campaign review expects to see,
+// distinct from the OTP message (which explicitly does not enroll anyone).
+export const OPT_IN_CONFIRMATION_TEXT =
+  "You're now signed up for GroveIQ SMS alerts. Msg frequency varies. Msg & data rates may apply. Reply STOP to unsubscribe, HELP for help.";
+
 export const CATEGORY_LABELS: Record<string, { label: string; example: string }> = {
   plant_health: { label: 'Plant health alerts', example: 'Stress, disease risk, care threshold' },
   sensor: { label: 'Sensor alerts', example: 'Device readings outside configured range' },

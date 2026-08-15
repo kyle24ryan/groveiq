@@ -3,7 +3,15 @@ import { corsHeaders } from './conditions';
 import { normalizeE164, hashPhone, redactPhone, decryptPhone } from '../sms/crypto';
 import { getOrCreatePhoneContact, recordConsentEvent, setCategoryEnabled, ALL_CATEGORIES, type ConsentCategory } from '../sms/consent';
 import { requestOtp, confirmOtp } from '../sms/otp';
-import { OPERATIONAL_CONSENT_TEXT, OPERATIONAL_CONSENT_TEXT_VERSION, PRIVACY_POLICY_VERSION, TERMS_VERSION, CATEGORY_LABELS } from '../sms/policyVersions';
+import { sendSms } from '../sms/twilio';
+import {
+  OPERATIONAL_CONSENT_TEXT,
+  OPERATIONAL_CONSENT_TEXT_VERSION,
+  PRIVACY_POLICY_VERSION,
+  TERMS_VERSION,
+  CATEGORY_LABELS,
+  OPT_IN_CONFIRMATION_TEXT,
+} from '../sms/policyVersions';
 
 function json(body: unknown, headers: HeadersInit, status = 200): Response {
   return Response.json(body, { status, headers });
@@ -146,6 +154,12 @@ export async function handleVerificationConfirm(request: Request, env: Env, head
       source: 'web',
       uiSurface: '/settings/notifications',
     });
+
+    // Program-level opt-in confirmation -- not category-gated (no category
+    // is enabled yet at this point, Step 3 hasn't happened), so this goes
+    // through sendSms() directly rather than sendOperationalSms(), the same
+    // way the OTP message itself bypasses category authorization.
+    await sendSms(env, normalized, OPT_IN_CONFIRMATION_TEXT);
   }
 
   return json({ ok: true }, headers);
