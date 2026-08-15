@@ -43,10 +43,25 @@ full round trip over the "Capture now" in-app request, `HTTP 200`,
   `main.cpp` — the irrigation loop previously had zero output on the happy
   path, which looked identical to a hang during bring-up.
 
-**Known follow-up, not a bug**: two consecutive live captures of
+**Root cause found and fixed**: two consecutive live captures of
 `silver-fir` came back "no clear view of the tree" from the vision model
-(one showed a deck/planter, not foliage) — likely the Reolink preset for
-that tree needs re-aiming, not a software issue.
+(one explicitly described a deck/planter, not foliage). Diagnosed by
+issuing the exact same Reolink login → `PtzCtrl` `ToPos` sequence directly
+via curl from a Mac, bypassing the ESP32 entirely: requesting `id: 1`
+(matching the app's displayed "preset 1") produced zero physical camera
+movement, while `id: 0` did move it. **Reolink's CGI API preset `id` is
+0-indexed**, while the app's UI shows presets as 1-based slots — `id: 1`
+was silently accepted as a valid-but-different (or nonexistent-but-still
+"successful") request, explaining why the API kept reporting `code: 0`
+success on every attempt despite pointing at the wrong thing the whole
+time. Fixed in `tree_presets.h` (all 5 values shifted down by one:
+`silver-fir` is now `0`, ..., `mountain-hemlock` is `4`) and mirrored in
+`scripts/camera-capture/config.example.json`'s `treePresets` for the Mac
+script, with a warning comment/README note in both places for whoever
+sets up the remaining 4 presets next. Also bumped `kSettleMs`
+2500ms→5000ms and added logging of the exact requested preset ID and the
+camera's full PTZ response — both were useful for this diagnosis and stay
+useful for the next one.
 
 **Security incident during this work, fixed same session**: a bench-test
 sketch was briefly committed to the (public) `kyle24ryan/groveiq` repo

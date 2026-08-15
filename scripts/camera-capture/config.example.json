@@ -6,13 +6,13 @@
   "cameraDeviceKey": "REPLACE_ME",
   "cfAccessClientId": "REPLACE_ME_WITH_SERVICE_TOKEN_CLIENT_ID",
   "cfAccessClientSecret": "REPLACE_ME_WITH_SERVICE_TOKEN_CLIENT_SECRET",
-  "settleMs": 2500,
+  "settleMs": 5000,
   "watchPollMs": 15000,
   "treePresets": {
-    "mountain-hemlock": 1,
-    "yellow-cedar-1": 2,
-    "yellow-cedar-2": 3,
-    "silver-fir": 4,
-    "dawn-redwood": 5
+    "silver-fir": 0,
+    "yellow-cedar-1": 1,
+    "yellow-cedar-2": 2,
+    "dawn-redwood": 3,
+    "mountain-hemlock": 4
   }
 }

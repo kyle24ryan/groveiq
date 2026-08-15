@@ -43,6 +43,12 @@ anything; otherwise the app just waits and eventually times out.
 2. **Set PTZ presets**, one per tree, in the Reolink app — point the
    camera at each tree and save a numbered preset. Note which preset
    number is which tree.
+
+   **The Reolink CGI API's preset `id` is 0-indexed** — confirmed live
+   2026-08-15 by testing directly with curl. If the app shows a preset as
+   slot "1", `config.json`'s `treePresets` (and `tree_presets.h` on the
+   ESP32) need `0`, not `1` — subtract 1 from whatever number the app
+   displays.
 3. **Add a `CAMERA_DEVICE_KEY` Worker secret**, from the repo root:
    ```bash
    openssl rand -hex 32 | npx wrangler secret put CAMERA_DEVICE_KEY
