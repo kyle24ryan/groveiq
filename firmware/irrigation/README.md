@@ -94,10 +94,14 @@ Every ~15s poll cycle it does two things:
 - **In-app "Capture now"** — polls `GET /api/v1/capture/command`; if a
   request is pending, moves the camera to that tree's preset, snapshots,
   and uploads. Mirrors `scripts/camera-capture/capture.mjs --watch`.
-- **Scheduled daily capture** — once NTP has synced (`configTime()` at task
-  start), captures every tree in `kTreePresets` once per day at
-  `kAutoCaptureHour` local time (default 10:00, matching the Mac launchd
-  schedule), deduped by `tm_yday`. Mirrors `capture.mjs --all --auto`.
+- **Scheduled daily capture** — once NTP has synced (`configTzTime()` at
+  task start, using America/Los_Angeles's POSIX TZ string so PST/PDT is
+  handled automatically), captures every tree in `kTreePresets` once per
+  day at `kAutoCaptureHour` **Pacific** time (default 10:00am, matching the
+  Mac launchd schedule), deduped by `tm_yday`. Mirrors `capture.mjs --all
+  --auto`. (Previously used plain `configTime()` with a 0 UTC offset — a
+  real bug that fired this at 10am UTC / 3am Pacific instead, fixed
+  2026-08-15.)
 
 TLS currently uses `WiFiClientSecure::setInsecure()` (skips certificate
 validation) rather than pinning Cloudflare's root CA — a known stopgap, not
