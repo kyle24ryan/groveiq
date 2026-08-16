@@ -5,7 +5,7 @@ actually built, per section 19.8's instruction to provide this table.
 Structured against section 17's pre-submission checklist since that's
 already the most actionable format in the source doc.
 
-Last updated: 2026-08-15.
+Last updated: 2026-08-16.
 
 ## Policies and public evidence
 
@@ -50,7 +50,7 @@ Last updated: 2026-08-15.
 
 | Item | Status | Notes |
 |---|---|---|
-| Production traffic uses a registered A2P campaign | ⏳ In progress, 1 rejection so far | First submission rejected (error 30909 — Message Flow/Call to Action didn't give reviewers enough opt-in detail). Resubmitted 2026-08-15 with a full field-by-field description of the real 3-step opt-in flow, matching what's actually in code |
+| Production traffic uses a registered A2P campaign | ⏳ In progress, 3 rejections so far | Rejection 1 (30909 — Message Flow/Call to Action lacked opt-in detail), rejection 2 (30893/30908/30886 — sample/use-case mismatch, privacy not verified, unclear description), rejection 3 (30908/30886 persisted even after applying the round-2 fix). Brand is registered **Sole Proprietor** ("Starter" use case) — confirmed via Twilio's own docs that this tier has exactly one use case available, no "Mixed" option to switch to, so all 3 rounds' fixes have been content-only. Round 3 fix (2026-08-16): tightened the campaign description to frame OTP as a step *within* the one alert program rather than a second purpose, and added Twilio's literal documented required sentence for 30908 ("We do not share, sell, or provide your mobile phone number or messaging consent data to third parties or affiliates for marketing or promotional purposes.") to both `/privacy` and the Message Flow field — the prior paragraph was semantically equivalent but not a literal match, which manual A2P vetting appears to require |
 | STOP/HELP/START tested end-to-end from a real handset | ❌ Blocked | Can't test until campaign approves (unregistered number is carrier-blocked, confirmed via Twilio error 30034 on the first live OTP test) |
 | Campaign content matches production behavior | ✅ Verified against code 2026-08-15 | Sample messages for resubmission pulled directly from `sms/otp.ts`, `sms/policyVersions.ts` (including the new `OPT_IN_CONFIRMATION_TEXT`), and `alerts.ts` — not just assumed to match |
 | `PrivacyPolicyUrl`/`TermsAndConditionsUrl` populated | ✅ Done | `https://grove-iq.com/privacy` / `/terms` — confirmed live via curl 2026-08-15, both return a clean `200` (redirects to trailing-slash form, no Access login block) |
@@ -60,7 +60,7 @@ Last updated: 2026-08-15.
 
 Per section 18: **not done yet.** Concretely blocking:
 1. ~~Cloudflare Access bypass for `/privacy`, `/terms`~~ — resolved, both confirmed returning `200` live 2026-08-15
-2. Twilio A2P 10DLC campaign approval (external, Twilio's timeline) — 1 rejection (30909), resubmitted 2026-08-15
+2. Twilio A2P 10DLC campaign approval (external, Twilio's timeline) — 3 rejections so far (30909; then 30893/30908/30886; then 30908/30886 again), resubmitted 2026-08-16 with a tightened single-purpose description and Twilio's literal required non-sharing sentence
 3. Handset-level STOP/HELP/START test (blocked by #2)
 4. Legal review of Privacy Policy / Terms content (explicitly required by the source doc's own front matter before real production launch)
 5. Accessibility audit (not started)
