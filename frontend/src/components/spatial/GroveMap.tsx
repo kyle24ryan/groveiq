@@ -35,6 +35,10 @@ function ringColorForAqi(aqi: number | null | undefined): string {
   return status === 'urgent' ? '#B91C1C' : status === 'watch' ? '#B45309' : '#2F6D4F';
 }
 
+function mapStyleForScheme(isDark: boolean): string {
+  return isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11';
+}
+
 // Native GroveIQ map shell (spec 7.2's "why here, why now?" panel) with a
 // real layer switcher (spec 7.3). Only "Precipitation" uses a genuine
 // gridded overlay (RainViewer's public, keyless radar tile API) -- the
@@ -55,9 +59,11 @@ export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, o
     if (!containerRef.current || !MAPBOX_TOKEN) return;
     mapboxgl.accessToken = MAPBOX_TOKEN;
 
+    const darkSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: 'mapbox://styles/mapbox/light-v11',
+      style: mapStyleForScheme(darkSchemeQuery.matches),
       center: [GROVE_LON, GROVE_LAT],
       zoom: 10.5,
       interactive: true,
@@ -74,8 +80,21 @@ export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, o
     groveEl.style.cssText = 'width:14px;height:14px;border-radius:50%;background:#2F6D4F;border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.15);z-index:2;position:relative;';
     new mapboxgl.Marker({ element: groveEl }).setLngLat([GROVE_LON, GROVE_LAT]).addTo(map);
 
+    // The rest of the app follows the OS's prefers-color-scheme live (pure
+    // CSS, no toggle) -- match that here rather than freezing the map's
+    // style at whatever the scheme was on mount. setStyle() re-fires
+    // 'style.load', so the ring/radar layers (gated on styleLoaded) get
+    // re-added automatically; the marker is a separate DOM overlay and
+    // survives a style change untouched.
+    const handleSchemeChange = (e: MediaQueryListEvent) => {
+      setStyleLoaded(false);
+      map.setStyle(mapStyleForScheme(e.matches));
+    };
+    darkSchemeQuery.addEventListener('change', handleSchemeChange);
+
     mapRef.current = map;
     return () => {
+      darkSchemeQuery.removeEventListener('change', handleSchemeChange);
       map.remove();
       mapRef.current = null;
     };
