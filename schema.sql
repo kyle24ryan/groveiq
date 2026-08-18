@@ -337,6 +337,17 @@ VALUES
 -- ============================================================
 -- SEED DATA: trees (Grove Collection -- Kyle Ryan, North Bend, WA)
 -- ============================================================
+-- soil_moisture_threshold_low/high (2026-08-18 revision): provisional,
+-- substrate-aware starting points, not calibrated per-sensor values. The
+-- original 32-38% lows assumed conventional soil and were far too high for
+-- the coarse conifer bonsai mix Mountain Hemlock and Silver Fir sit in --
+-- Ecowitt's frequency-domain sensor reads a substrate-dependent moisture
+-- index, not a universal soil-water percentage, and a mix with more air
+-- space reads lower at the same usable moisture level than potting soil
+-- does. The 99% highs on those two intentionally disable "too wet"
+-- warnings until real wet/dry calibration exists (see CHECKLIST.md) --
+-- a brief high reading right after watering in a freely-draining mix
+-- isn't waterlogging.
 INSERT OR IGNORE INTO trees
   (id, name, nickname, species, pot_size_liters, origin_notes, origin_type, acquired_date,
    estimated_age_years_low, estimated_age_years_high, development_stage, notes,
@@ -347,35 +358,35 @@ VALUES
   'Yamadori, collected from Washington State, acquired summer 2026.', 'yamadori', 'Summer 2026',
   50, 80, 'recovery',
   'Flagship tree of the collection. Large aged trunk with significant natural movement and deadwood. Currently in a recovery nursery container after collection. No styling planned until spring 2027.',
-  35, 75, 2.3, 5
+  15, 99, 2.3, 5
 ),
 (
   'yellow-cedar-1', 'Alaska Yellow Cedar #1', NULL, 'Alaska Yellow Cedar', NULL,
   'Nursery-grown.', 'nursery', NULL,
   4, 6, 'recovery',
   'Young pre-bonsai being grown for trunk development. Recovery only this season.',
-  38, 78, 2.2, 6
+  30, 82, 2.2, 6
 ),
 (
   'yellow-cedar-2', 'Alaska Yellow Cedar #2', NULL, 'Alaska Yellow Cedar', NULL,
   'Nursery-grown.', 'nursery', NULL,
   4, 6, 'recovery',
   'Companion tree to Yellow Cedar #1 with a different future styling direction. No work planned until spring.',
-  38, 78, 2.2, 6
+  30, 82, 2.2, 6
 ),
 (
   'silver-fir', 'Silver Fir', 'Tipsoo', 'Silver Fir', NULL,
   'Nursery-grown.', 'nursery', NULL,
   3, 5, 'development',
   'Early development tree. Being established before any structural work. Exact Abies species unconfirmed.',
-  33, 72, 2.4, 6
+  12, 99, 2.4, 6
 ),
 (
   'dawn-redwood', 'Dawn Redwood', NULL, 'Dawn Redwood', NULL,
   'Nursery-grown.', 'nursery', NULL,
   2, 4, 'development',
   'Fast-growing deciduous conifer intended for future bonsai development. Will be allowed to grow freely for now.',
-  32, 80, 2.5, 7
+  28, 88, 2.5, 7
 );
 
 -- v1 single-zone irrigation hardware is assigned to Silver Fir ("Tipsoo")

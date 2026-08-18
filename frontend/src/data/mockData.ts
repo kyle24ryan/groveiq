@@ -16,8 +16,8 @@ export const trees: Tree[] = [
     developmentStage: 'recovery',
     notes:
       'Flagship tree of the collection. Large aged trunk with significant natural movement and deadwood. Currently in a recovery nursery container after collection. No styling planned until spring 2027.',
-    soilMoistureThresholdLow: 35,
-    soilMoistureThresholdHigh: 75,
+    soilMoistureThresholdLow: 15,
+    soilMoistureThresholdHigh: 99,
     ecThresholdHigh: 2.3,
     dormancySoilTempC: 5,
   },
@@ -34,8 +34,8 @@ export const trees: Tree[] = [
     estimatedAgeYearsHigh: 6,
     developmentStage: 'recovery',
     notes: 'Young pre-bonsai being grown for trunk development. Recovery only this season.',
-    soilMoistureThresholdLow: 38,
-    soilMoistureThresholdHigh: 78,
+    soilMoistureThresholdLow: 30,
+    soilMoistureThresholdHigh: 82,
     ecThresholdHigh: 2.2,
     dormancySoilTempC: 6,
   },
@@ -52,8 +52,8 @@ export const trees: Tree[] = [
     estimatedAgeYearsHigh: 6,
     developmentStage: 'recovery',
     notes: 'Companion tree to Yellow Cedar #1 with a different future styling direction. No work planned until spring.',
-    soilMoistureThresholdLow: 38,
-    soilMoistureThresholdHigh: 78,
+    soilMoistureThresholdLow: 30,
+    soilMoistureThresholdHigh: 82,
     ecThresholdHigh: 2.2,
     dormancySoilTempC: 6,
   },
@@ -70,8 +70,8 @@ export const trees: Tree[] = [
     estimatedAgeYearsHigh: 5,
     developmentStage: 'development',
     notes: 'Early development tree. Being established before any structural work. Exact Abies species unconfirmed.',
-    soilMoistureThresholdLow: 33,
-    soilMoistureThresholdHigh: 72,
+    soilMoistureThresholdLow: 12,
+    soilMoistureThresholdHigh: 99,
     ecThresholdHigh: 2.4,
     dormancySoilTempC: 6,
   },
@@ -88,8 +88,8 @@ export const trees: Tree[] = [
     estimatedAgeYearsHigh: 4,
     developmentStage: 'development',
     notes: 'Fast-growing deciduous conifer intended for future bonsai development. Will be allowed to grow freely for now.',
-    soilMoistureThresholdLow: 32,
-    soilMoistureThresholdHigh: 80,
+    soilMoistureThresholdLow: 28,
+    soilMoistureThresholdHigh: 88,
     ecThresholdHigh: 2.5,
     dormancySoilTempC: 7,
   },
@@ -362,7 +362,7 @@ export function insightFor(treeId: string): Insight {
 
   if (a.belowThreshold) {
     title = 'GroveIQ: soil moisture below threshold.';
-    headline = `${a.tree.name} is below its safe soil moisture threshold`;
+    headline = `${a.tree.name} is below its soil moisture threshold`;
     evidence = `Soil moisture at ${a.latest.soilMoistureAvg}%, below its ${a.tree.soilMoistureThresholdLow}% threshold.`;
     likelyCause = driver.description;
     action = 'Water today and recheck this evening.';

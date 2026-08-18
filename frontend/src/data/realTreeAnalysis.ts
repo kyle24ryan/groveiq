@@ -164,7 +164,7 @@ export function insightForReal(a: RealTreeAnalysis, dailyHistory: DailyReading[]
     evidence = 'The soil sensor for this tree has not reported a reading recently -- check that it has power and is within range of the gateway.';
   } else if (a.belowThreshold) {
     title = 'GroveIQ: soil moisture below threshold.';
-    headline = `${a.tree.name} is below its safe soil moisture threshold`;
+    headline = `${a.tree.name} is below its soil moisture threshold`;
     evidence = `Soil moisture at ${a.latest.soilMoistureAvg}%, below its ${a.tree.soilMoistureThresholdLow}% threshold.`;
     action = 'Water today and recheck this evening.';
     thresholdValue = a.tree.soilMoistureThresholdLow;
