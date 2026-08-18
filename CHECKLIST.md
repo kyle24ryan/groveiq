@@ -578,8 +578,10 @@ still blocked on Phase 1 hardware.
 
 ## Open decisions carried from SPEC.md section 7 (still open)
 
-- ~~NWS forecast lat/long~~ resolved — 47.49,-121.7871 confirmed to resolve
-  to North Bend WA specifically (gridId SEW), not a generic Seattle station
+- ~~NWS forecast lat/long~~ resolved — 47.4776620,-121.7300978
+  (user-provided GPS 2026-08-17, previously an approximate placeholder)
+  confirmed to resolve to North Bend WA specifically (gridId SEW, gridX
+  142, gridY 58), not a generic Seattle station
 - AirNow API key not signed up for — code is ready, just needs the key
 - Dormancy thresholds are rough per-species guesses, not researched
 - Self-tuning threshold auto-apply vs. always-ask: undecided (leaning

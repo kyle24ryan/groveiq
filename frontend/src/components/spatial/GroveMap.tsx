@@ -309,7 +309,12 @@ export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, o
         if (!latest) return;
         const tileUrl = `${data.host}${latest.path}/256/{z}/{x}/{y}/2/1_1.png`;
         removeRadar();
-        map.addSource(RAIN_SOURCE_ID, { type: 'raster', tiles: [tileUrl], tileSize: 256, attribution: 'Radar © <a href="https://www.rainviewer.com" target="_blank" rel="noreferrer">RainViewer</a>' });
+        // RainViewer's tile server doesn't serve tiles past z10 -- without
+        // maxzoom, zooming in past that shows their own "Zoom Level Not
+        // Supported" placeholder image instead of radar. Capping it here
+        // makes Mapbox overzoom (upscale) the z10 tile instead, same as
+        // any other raster source with limited native resolution.
+        map.addSource(RAIN_SOURCE_ID, { type: 'raster', tiles: [tileUrl], tileSize: 256, maxzoom: 10, attribution: 'Radar © <a href="https://www.rainviewer.com" target="_blank" rel="noreferrer">RainViewer</a>' });
         map.addLayer({ id: RAIN_LAYER_ID, type: 'raster', source: RAIN_SOURCE_ID, paint: { 'raster-opacity': 0.65 } });
         onSourceInfo?.({ label: 'RainViewer radar', freshness: new Date(latest.time * 1000).toLocaleTimeString() });
       })

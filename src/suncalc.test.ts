@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { computeSunTimes, sunTimesLocal } from './suncalc';
 
 // North Bend, WA (matches nws.ts's GROVE_LAT/GROVE_LON).
-const LAT = 47.49;
-const LON = -121.7871;
+const LAT = 47.4776620;
+const LON = -121.7300978;
 
 describe('computeSunTimes', () => {
   it('places sunrise before solar noon and sunset after it', () => {

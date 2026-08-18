@@ -1,14 +1,15 @@
 // NWS (api.weather.gov) forecast integration. Free, no API key required.
 //
-// Verified against real North Bend, WA coordinates before writing this:
-// /points/47.4900,-121.7871 resolves to gridId SEW, gridX 141, gridY 59,
-// relativeLocation "North Bend WA" specifically -- not a generic Seattle
-// station, which SPEC.md 1a explicitly warned about.
+// User-provided GPS coordinates (2026-08-17) -- the previous value was an
+// approximate North Bend, WA location, not the actual grove site.
+// Verified: /points/47.4776620,-121.7300978 resolves to gridId SEW,
+// gridX 142, gridY 58, relativeLocation "North Bend WA" specifically --
+// not a generic Seattle station, which SPEC.md 1a explicitly warned about.
 
 import type { Env } from './env';
 
-const GROVE_LAT = 47.49;
-const GROVE_LON = -121.7871;
+const GROVE_LAT = 47.4776620;
+const GROVE_LON = -121.7300978;
 const USER_AGENT = 'GroveIQ (https://grove-iq.com)';
 
 type NwsPeriod = {
