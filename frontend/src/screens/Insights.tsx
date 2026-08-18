@@ -1,16 +1,16 @@
 import { Link } from 'react-router-dom';
 import { PriorityIntelligencePanel } from '../components/overview/PriorityIntelligencePanel';
 import { StatusBadge } from '../components/StatusBadge';
-import { trees, allInsights } from '../data/mockData';
+import { useTreeInsights } from '../hooks/useTreeInsights';
 
 // The Intelligence surface (spec Phase 5): every active detection gets the
 // same dense evidence panel as Overview's single priority signal, sharing
-// the exact same analyzeTree()/insightFor() outputs so this screen can't
-// disagree with the sidebar, Overview, or Tree Detail. Stable trees are
-// collapsed to a single low-emphasis row each rather than repeating a full
-// panel with nothing to show.
+// the same real per-tree insight data (useTreeInsights) as every other
+// screen so this can't disagree with the sidebar, Overview, or Tree
+// Detail. Stable trees are collapsed to a single low-emphasis row each
+// rather than repeating a full panel with nothing to show.
 export function Insights() {
-  const insights = allInsights();
+  const { loading, trees, insights } = useTreeInsights();
   const active = insights.filter((i) => i.status !== 'ok');
   const stable = insights.filter((i) => i.status === 'ok');
 
@@ -23,12 +23,15 @@ export function Insights() {
         </p>
       </div>
 
-      {active.length === 0 ? (
+      {loading ? (
+        <p style={{ fontSize: 13.5, color: 'var(--ink-soft)' }}>Loading…</p>
+      ) : active.length === 0 ? (
         <p style={{ fontSize: 13.5, color: 'var(--ink-soft)' }}>Nothing needs attention right now — every tree is within its expected range.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {active.map((insight) => {
-            const tree = trees.find((t) => t.id === insight.treeId)!;
+            const tree = trees.find((t) => t.id === insight.treeId);
+            if (!tree) return null;
             const sibling = trees.find((t) => t.species === tree.species && t.id !== tree.id);
             return <PriorityIntelligencePanel key={insight.id} insight={insight} tree={tree} sibling={sibling} eyebrowLabel="Active signal" />;
           })}
@@ -42,7 +45,8 @@ export function Insights() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {stable.map((insight) => {
-              const tree = trees.find((t) => t.id === insight.treeId)!;
+              const tree = trees.find((t) => t.id === insight.treeId);
+              if (!tree) return null;
               return (
                 <Link
                   key={insight.id}

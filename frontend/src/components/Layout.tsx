@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { trees, insightFor } from '../data/mockData';
+import { useTreeInsights } from '../hooks/useTreeInsights';
+import type { Status } from '../data/types';
 
 const navItems = [
   { to: '/', label: 'Overview', end: true },
@@ -27,6 +28,7 @@ const linkStyle = ({ isActive }: { isActive: boolean }) => ({
 // theme.css. Desktop/tablet keep the always-visible sidebar unchanged.
 export function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { trees, insightByTreeId } = useTreeInsights();
 
   function closeMobile() {
     setMobileOpen(false);
@@ -66,7 +68,7 @@ export function Layout() {
             Collection
           </div>
           {trees.map((tree) => {
-            const insight = insightFor(tree.id);
+            const status = insightByTreeId[tree.id]?.status ?? 'ok';
             return (
               <NavLink
                 key={tree.id}
@@ -84,7 +86,7 @@ export function Layout() {
                   textDecoration: 'none',
                 })}
               >
-                <span className={`status-dot status-${insight.status}`} aria-label={insight.status} title={insight.status} />
+                <span className={`status-dot status-${status}`} aria-label={status} title={status} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tree.name}</span>
               </NavLink>
             );
@@ -107,7 +109,7 @@ export function Layout() {
             ☰
           </button>
           <span style={{ fontSize: 15, fontWeight: 700 }}>GroveIQ</span>
-          <span className={`status-dot status-${worstCollectionStatus()}`} style={{ marginLeft: 'auto', width: 44, textAlign: 'center' }} aria-hidden="true" />
+          <span className={`status-dot status-${worstCollectionStatus(trees, insightByTreeId)}`} style={{ marginLeft: 'auto', width: 44, textAlign: 'center' }} aria-hidden="true" />
         </div>
         <main className="groveiq-main" style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
           <Outlet />
@@ -130,11 +132,11 @@ const sidebarStyle = {
 
 // Worst status across the whole collection, for the top-bar dot on mobile
 // where the full sidebar (with its per-tree dots) is collapsed away.
-function worstCollectionStatus(): 'ok' | 'watch' | 'urgent' {
-  const rank: Record<'ok' | 'watch' | 'urgent', number> = { urgent: 0, watch: 1, ok: 2 };
-  let worst: 'ok' | 'watch' | 'urgent' = 'ok';
+function worstCollectionStatus(trees: { id: string }[], insightByTreeId: Record<string, { status: Status }>): Status {
+  const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
+  let worst: Status = 'ok';
   for (const tree of trees) {
-    const status = insightFor(tree.id).status;
+    const status = insightByTreeId[tree.id]?.status ?? 'ok';
     if (rank[status] < rank[worst]) worst = status;
   }
   return worst;

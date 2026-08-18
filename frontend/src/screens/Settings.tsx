@@ -112,7 +112,7 @@ export function Settings() {
               <DeviceSubRow name="Black-globe sensor" status={latest.battery_bgt_voltage_v != null ? `${latest.battery_bgt_voltage_v}V` : 'Unknown'} />
             </div>
           )}
-          <DeviceRow name="Soil moisture probes (5)" status="Ordered, not yet arrived" />
+          <DeviceRow name="Soil moisture probes (5)" status="Installed and reporting, live since 2026-08-17" />
           <DeviceRow name="Camera" status="Ordered, not yet installed" />
           <DeviceRow name="Irrigation controller" status="Hardware in hand, firmware scaffolded and untested" />
         </div>
@@ -123,8 +123,10 @@ export function Settings() {
           Data mode
         </div>
         <p style={{ fontSize: 13.5 }}>
-          Environment and Grove's weather strip now read the live feed from the weather gateway. Per-tree readings (soil
-          moisture, EC, status) are still demo data — soil probes haven't arrived yet, so there's nothing real to show there.
+          Environment and Grove's weather strip read the live feed from the weather gateway. Per-tree readings (soil
+          moisture, EC, status) are now live from the soil probes as of 2026-08-17. Trend and history features need a
+          few days of accumulated readings before they activate — until then, affected trees show a "gathering history"
+          state rather than a guess.
         </p>
       </Card>
 

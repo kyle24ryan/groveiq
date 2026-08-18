@@ -1,4 +1,3 @@
-import { trees } from '../data/mockData';
 import { useGroveOverview } from '../hooks/useGroveOverview';
 import { AlertBanner } from '../components/AlertBanner';
 import { SituationalHeader } from '../components/overview/SituationalHeader';
@@ -9,19 +8,35 @@ import { NextRiskPanel } from '../components/overview/NextRiskPanel';
 import { EnvironmentalContextPanel } from '../components/environment-map/EnvironmentalContextPanel';
 
 export function Grove() {
-  const { latest, regionalAqi, forecast, counts, needsAttention, priorityInsight, priorityTree, vpd, demand, freshness, sortedTrees } = useGroveOverview();
+  const {
+    latest,
+    regionalAqi,
+    forecast,
+    counts,
+    needsAttention,
+    priorityInsight,
+    priorityTree,
+    vpd,
+    demand,
+    freshness,
+    sortedTrees,
+    analyses,
+    insightByTreeId,
+    treesWithLiveReading,
+  } = useGroveOverview();
 
-  const sibling = priorityTree ? trees.find((t) => t.species === priorityTree.species && t.id !== priorityTree.id) : undefined;
+  const sibling = priorityTree ? sortedTrees.find((t) => t.species === priorityTree.species && t.id !== priorityTree.id) : undefined;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1200 }}>
       <SituationalHeader
         urgentCount={counts.urgent}
         watchCount={counts.watch}
-        treeCount={trees.length}
+        treeCount={sortedTrees.length}
         freshnessLabel={freshness.label}
         freshnessStale={freshness.stale}
         hasLiveConditions={latest != null}
+        treesWithLiveReading={treesWithLiveReading}
       />
 
       <AlertBanner />
@@ -56,10 +71,10 @@ export function Grove() {
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             Collection
           </div>
-          <CollectionStatusMatrix trees={sortedTrees} />
+          <CollectionStatusMatrix trees={sortedTrees} analyses={analyses} insightByTreeId={insightByTreeId} />
         </div>
         <NextRiskPanel
-          trees={trees}
+          analyses={Object.values(analyses)}
           priorityInsight={priorityInsight}
           priorityTreeName={priorityTree?.name}
           demandLabel={demand.label}

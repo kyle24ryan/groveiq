@@ -55,6 +55,29 @@ async function handleSoilReadings(env: Env, id: string, headers: HeadersInit, ho
   return Response.json({ readings: results }, { headers });
 }
 
+type DailyReadingRow = {
+  date: string;
+  soil_moisture_avg: number | null;
+  soil_moisture_min: number | null;
+  soil_moisture_max: number | null;
+  soil_temp_avg: number | null;
+  soil_ec_avg: number | null;
+  outdoor_temp_avg: number | null;
+  outdoor_temp_min: number | null;
+  humidity_avg: number | null;
+  wind_max: number | null;
+  rain_total: number | null;
+  black_globe_max: number | null;
+  pm25_avg: number | null;
+};
+
+async function handleDailyReadings(env: Env, id: string, headers: HeadersInit, days: number): Promise<Response> {
+  const { results } = await env.DB.prepare(`SELECT * FROM daily_readings WHERE tree_id = ? AND date >= date('now', ?) ORDER BY date ASC`)
+    .bind(id, `-${days} days`)
+    .all<DailyReadingRow>();
+  return Response.json({ readings: results }, { headers });
+}
+
 async function handleListTrees(env: Env, headers: HeadersInit): Promise<Response> {
   const { results } = await env.DB.prepare('SELECT * FROM trees ORDER BY name').all<TreeRow>();
   return Response.json({ trees: results }, { headers });
@@ -97,7 +120,8 @@ export async function handleTreesRoute(request: Request, env: Env, pathname: str
   const listMatch = pathname === '/api/v1/trees';
   const singleMatch = pathname.match(/^\/api\/v1\/trees\/([^/]+)$/);
   const soilMatch = pathname.match(/^\/api\/v1\/trees\/([^/]+)\/soil-readings$/);
-  if (!listMatch && !singleMatch && !soilMatch) return null;
+  const dailyMatch = pathname.match(/^\/api\/v1\/trees\/([^/]+)\/daily-readings$/);
+  if (!listMatch && !singleMatch && !soilMatch && !dailyMatch) return null;
 
   const headers = corsHeaders(request);
   if (request.method === 'OPTIONS') return new Response(null, { headers });
@@ -109,6 +133,11 @@ export async function handleTreesRoute(request: Request, env: Env, pathname: str
     const url = new URL(request.url);
     const hours = Number(url.searchParams.get('hours')) || 720; // 30 days default
     return handleSoilReadings(env, soilMatch[1], headers, hours);
+  }
+  if (dailyMatch && request.method === 'GET') {
+    const url = new URL(request.url);
+    const days = Number(url.searchParams.get('days')) || 30;
+    return handleDailyReadings(env, dailyMatch[1], headers, days);
   }
   if (singleMatch && request.method === 'GET') {
     return handleGetTree(env, singleMatch[1], headers);

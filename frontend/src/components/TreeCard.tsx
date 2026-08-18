@@ -4,10 +4,10 @@ import { StatusBadge } from './StatusBadge';
 import { Sparkline } from './Sparkline';
 import { InfoTooltip } from './InfoTooltip';
 import { metricInfo } from '../data/metricInfo';
-import { dailyReadingsFor, insightFor, analyzeTree } from '../data/mockData';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
-import type { Tree } from '../data/types';
+import type { Tree, Insight, DailyReading } from '../data/types';
+import type { RealTreeAnalysis } from '../data/realTreeAnalysis';
 
 const sparklineColor: Record<'ok' | 'watch' | 'urgent', string> = {
   ok: 'var(--ok)',
@@ -15,13 +15,22 @@ const sparklineColor: Record<'ok' | 'watch' | 'urgent', string> = {
   urgent: 'var(--urgent)',
 };
 
-export function TreeCard({ tree }: { tree: Tree }) {
+type TreeCardProps = {
+  tree: Tree;
+  insight: Insight;
+  analysis: RealTreeAnalysis;
+  dailyReadings: DailyReading[];
+};
+
+// insight/analysis/dailyReadings are passed in (shared with every other
+// screen via useTreeInsights) rather than recomputed here -- this
+// component previously called dailyReadingsFor()/insightFor()/
+// analyzeTree() directly, its own independent computation that could
+// disagree with what the rest of the app was showing for the same tree.
+export function TreeCard({ tree, insight, analysis, dailyReadings }: TreeCardProps) {
   const { system } = useUnits();
-  const readings = dailyReadingsFor(tree.id, 14);
-  const insight = insightFor(tree.id);
-  // Shares analyzeTree with insightFor/statusFor so the arrow can never
-  // disagree with the insight text below it.
-  const { latest, changePct } = analyzeTree(tree.id);
+  const readings = dailyReadings;
+  const { latest, changePct, hasCurrentReading } = analysis;
 
   return (
     <Link to={`/trees/${tree.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -42,19 +51,27 @@ export function TreeCard({ tree }: { tree: Tree }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
               <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
-                {latest.soilMoistureAvg}%
+                {hasCurrentReading ? `${latest.soilMoistureAvg}%` : '—'}
               </span>
-              <span className={`status-${changePct < 0 ? 'watch' : 'ok'}`} style={{ fontSize: 12 }}>
-                {changePct < 0 ? '↓' : '↑'} {Math.abs(changePct)}%
-              </span>
+              {hasCurrentReading && (
+                <span className={`status-${changePct < 0 ? 'watch' : 'ok'}`} style={{ fontSize: 12 }}>
+                  {changePct < 0 ? '↓' : '↑'} {Math.abs(changePct)}%
+                </span>
+              )}
             </div>
           </div>
           <Sparkline values={readings.map((r) => r.soilMoistureAvg)} color={sparklineColor[insight.status]} />
         </div>
 
         <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-soft)' }}>
-          <span className="mono">EC {latest.soilEcAvg} mS/cm</span>
-          <span className="mono">{formatTemp(latest.soilTempAvg, system)}{tempUnit(system)}</span>
+          {hasCurrentReading ? (
+            <>
+              <span className="mono">EC {latest.soilEcAvg} mS/cm</span>
+              <span className="mono">{formatTemp(latest.soilTempAvg, system)}{tempUnit(system)}</span>
+            </>
+          ) : (
+            <span className="mono">No recent soil reading</span>
+          )}
         </div>
 
         <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', paddingTop: 10, borderTop: '1px solid var(--border)' }}>

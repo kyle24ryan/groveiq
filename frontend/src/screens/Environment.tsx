@@ -11,7 +11,8 @@ import { Collapsible } from '../components/Collapsible';
 import { MiniTrendChart, ChartToggle, useChartToggle } from '../components/MiniTrendChart';
 import { metricInfo } from '../data/metricInfo';
 import { aqiCategory } from '../lib/aqi';
-import { trees, vpdKPa, waterDemandNow, insightFor } from '../data/mockData';
+import { vpdKPa, waterDemandNow } from '../data/mockData';
+import { useTreeInsights } from '../hooks/useTreeInsights';
 import {
   fetchLatestConditions,
   fetchConditionsHistory,
@@ -48,6 +49,7 @@ function fmt(value: number | null, digits = 1): string {
 
 export function Environment() {
   const { system } = useUnits();
+  const { insights: treeInsights, trees } = useTreeInsights();
   const [latest, setLatest] = useState<ConditionsReading | null>(null);
   const [history, setHistory] = useState<ConditionsReading[]>([]);
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
@@ -90,11 +92,8 @@ export function Environment() {
   }, []);
 
   const rainNext48h = forecast.slice(0, 2);
-  const priorityInsight = [...trees.map((t) => insightFor(t.id))].sort((a, b) => {
-    const rank = { urgent: 0, watch: 1, ok: 2 } as const;
-    return rank[a.status] - rank[b.status];
-  })[0];
-  const priorityTree = trees.find((t) => t.id === priorityInsight.treeId);
+  const priorityInsight = treeInsights[0];
+  const priorityTree = priorityInsight ? trees.find((t) => t.id === priorityInsight.treeId) : undefined;
 
   const vpd = latest?.outdoor_temp_c != null && latest?.humidity_pct != null ? vpdKPa(latest.outdoor_temp_c, latest.humidity_pct) : null;
   const demand = vpd !== null ? waterDemandNow(vpd) : null;
@@ -380,8 +379,8 @@ export function Environment() {
             </div>
             <p style={{ fontSize: 13.5 }}>
               {demand ? `${demand.label} evaporative demand right now (VPD ${vpd?.toFixed(2)} kPa).` : 'Waiting on live data.'}{' '}
-              {priorityTree && priorityInsight.implication
-                ? `${priorityTree.name} ${priorityInsight.implication.toLowerCase()} (demo tree data — soil sensors not yet installed.)`
+              {priorityTree && priorityInsight?.implication
+                ? `${priorityTree.name} ${priorityInsight.implication.toLowerCase()}`
                 : 'No trees are projected to cross a threshold today.'}
             </p>
           </Card>

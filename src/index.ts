@@ -18,6 +18,7 @@ import { fetchEcowittRealTime, writeConditionsReading, writeSoilReadings } from 
 import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
 import { fetchNwsForecast, writeForecasts } from './nws';
 import { fetchAirNow, writeAirNowObservation } from './airnow';
+import { rollUpDailyReadings, yesterdayGroveLocalDateStr } from './dailyRollup';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -140,11 +141,20 @@ export default {
       return Response.json({ alerts: results });
     }
 
-    // TODO: temporary, for testing the daily NWS/AirNow job on-demand
+    // TODO: temporary, for testing the daily NWS/AirNow/rollup job on-demand
     // instead of waiting for the 13:00 UTC cron.
     if (url.pathname === '/api/debug/daily-job') {
       const result = await runDailyJob(env);
       return Response.json(result);
+    }
+
+    // TODO: temporary, for testing the daily_readings rollup against an
+    // arbitrary date (e.g. today, while it's still in progress) without
+    // waiting for the real "yesterday" rollup to have data to work with.
+    if (url.pathname === '/api/debug/rollup') {
+      const date = url.searchParams.get('date') ?? yesterdayGroveLocalDateStr();
+      const result = await rollUpDailyReadings(env, date);
+      return Response.json({ date, ...result });
     }
 
     return new Response('GroveIQ API — Phase 0 skeleton', {
@@ -171,7 +181,7 @@ export default {
   },
 };
 
-async function runDailyJob(env: Env): Promise<{ forecastDays: number; airnow: boolean; errors: string[] }> {
+async function runDailyJob(env: Env): Promise<{ forecastDays: number; airnow: boolean; dailyReadingsRolledUp: number; errors: string[] }> {
   const errors: string[] = [];
   let forecastDays = 0;
   let airnow = false;
@@ -195,5 +205,13 @@ async function runDailyJob(env: Env): Promise<{ forecastDays: number; airnow: bo
     errors.push(`AirNow: ${String(err)}`);
   }
 
-  return { forecastDays, airnow, errors };
+  let dailyReadingsRolledUp = 0;
+  try {
+    const result = await rollUpDailyReadings(env, yesterdayGroveLocalDateStr());
+    dailyReadingsRolledUp = result.treesRolledUp;
+  } catch (err) {
+    errors.push(`Daily rollup: ${String(err)}`);
+  }
+
+  return { forecastDays, airnow, dailyReadingsRolledUp, errors };
 }

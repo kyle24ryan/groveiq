@@ -1,30 +1,40 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/Card';
 import { MetricValue } from '../components/MetricValue';
-import { trees, dailyReadingsFor, milestonesFor, insightFor } from '../data/mockData';
+import { milestonesFor } from '../data/mockData';
+import { useTreeInsights } from '../hooks/useTreeInsights';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
 import { metricInfo } from '../data/metricInfo';
 import { fetchTreeAnalyses, photoUrl, type PhotoAnalysis } from '../lib/api';
 import type { Status } from '../data/types';
 
-const RANGE_DAYS = 90;
 const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
-
-// Tree picker and default selection are worst-first, matching the
-// sidebar/Overview convention -- previously defaulted to trees[0] and
-// listed trees in raw array order regardless of what needed attention.
-const sortedTrees = [...trees].sort((a, b) => rank[insightFor(a.id).status] - rank[insightFor(b.id).status]);
 
 export function Timeline() {
   const { system } = useUnits();
-  const [treeId, setTreeId] = useState(sortedTrees[0].id);
-  const readings = useMemo(() => dailyReadingsFor(treeId, RANGE_DAYS), [treeId]);
-  const milestones = useMemo(() => milestonesFor(treeId), [treeId]);
-  const [index, setIndex] = useState(readings.length - 1);
+  const { loading, trees, insightByTreeId, dailyReadingsByTree } = useTreeInsights();
+  const [treeId, setTreeId] = useState<string | null>(null);
+  const [index, setIndex] = useState(0);
   const [photoAnalyses, setPhotoAnalyses] = useState<PhotoAnalysis[]>([]);
 
+  // Worst-first ordering, matching the sidebar/Overview convention.
+  // Recomputed from real insights, not knowable until they've loaded.
+  const sortedTrees = useMemo(
+    () => [...trees].sort((a, b) => rank[insightByTreeId[a.id]?.status ?? 'ok'] - rank[insightByTreeId[b.id]?.status ?? 'ok']),
+    [trees, insightByTreeId]
+  );
+
+  // Default to the worst-off tree once real insights are in -- can't be
+  // known synchronously the way the old mock-data version could.
   useEffect(() => {
+    if (!loading && !treeId && sortedTrees.length > 0) {
+      setTreeId(sortedTrees[0].id);
+    }
+  }, [loading, treeId, sortedTrees]);
+
+  useEffect(() => {
+    if (!treeId) return;
     let cancelled = false;
     fetchTreeAnalyses(treeId)
       .then((analyses) => {
@@ -38,36 +48,50 @@ export function Timeline() {
     };
   }, [treeId]);
 
-  const tree = trees.find((t) => t.id === treeId)!;
-  const reading = readings[Math.min(index, readings.length - 1)];
+  const tree = treeId ? trees.find((t) => t.id === treeId) : undefined;
+  const readings = treeId ? (dailyReadingsByTree[treeId] ?? []) : [];
+  const reading = readings.length > 0 ? readings[Math.min(index, readings.length - 1)] : null;
+  const milestones = treeId ? milestonesFor(treeId) : [];
 
   // Nearest real photo in time to the scrubbed date, matching this page's
   // own "imagery, readings, and events... synchronized" framing -- not
   // just always showing the latest capture regardless of scrub position.
   const nearestPhoto = useMemo(() => {
-    if (photoAnalyses.length === 0) return null;
+    if (photoAnalyses.length === 0 || !reading) return null;
     const targetMs = new Date(reading.date).getTime();
     return photoAnalyses.reduce((closest, a) => {
       const aDiff = Math.abs(new Date(a.ts).getTime() - targetMs);
       const closestDiff = Math.abs(new Date(closest.ts).getTime() - targetMs);
       return aDiff < closestDiff ? a : closest;
     });
-  }, [photoAnalyses, reading.date]);
-  const moistureInRange = reading.soilMoistureAvg >= tree.soilMoistureThresholdLow && reading.soilMoistureAvg <= tree.soilMoistureThresholdHigh;
-  const ecInRange = reading.soilEcAvg <= tree.ecThresholdHigh;
+  }, [photoAnalyses, reading]);
 
-  const rangeStart = new Date(readings[0].date).getTime();
-  const rangeEnd = new Date(readings[readings.length - 1].date).getTime();
+  const moistureInRange = reading && tree ? reading.soilMoistureAvg >= tree.soilMoistureThresholdLow && reading.soilMoistureAvg <= tree.soilMoistureThresholdHigh : true;
+  const ecInRange = reading && tree ? reading.soilEcAvg <= tree.ecThresholdHigh : true;
+
+  const rangeStart = readings.length > 0 ? new Date(readings[0].date).getTime() : 0;
+  const rangeEnd = readings.length > 0 ? new Date(readings[readings.length - 1].date).getTime() : 0;
   const markers = milestones
     .filter((m) => {
       const t = new Date(m.date).getTime();
-      return t >= rangeStart && t <= rangeEnd;
+      return readings.length > 0 && t >= rangeStart && t <= rangeEnd;
     })
-    .map((m) => ({ ...m, pct: ((new Date(m.date).getTime() - rangeStart) / (rangeEnd - rangeStart)) * 100 }));
+    .map((m) => ({ ...m, pct: rangeEnd > rangeStart ? ((new Date(m.date).getTime() - rangeStart) / (rangeEnd - rangeStart)) * 100 : 0 }));
 
   function handleTreeChange(id: string) {
     setTreeId(id);
-    setIndex(dailyReadingsFor(id, RANGE_DAYS).length - 1);
+    setIndex(0);
+  }
+
+  if (loading || !tree) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 960 }}>
+        <div>
+          <h1 style={{ fontSize: 24 }}>Timeline</h1>
+          <p style={{ color: 'var(--ink-soft)', marginTop: 4, fontSize: 14 }}>Loading…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -81,7 +105,7 @@ export function Timeline() {
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {sortedTrees.map((t) => {
-          const status = insightFor(t.id).status;
+          const status = insightByTreeId[t.id]?.status ?? 'ok';
           return (
             <button
               key={t.id}
@@ -137,55 +161,65 @@ export function Timeline() {
           </div>
         )}
 
-        <div style={{ position: 'relative', marginBottom: 8 }}>
-          <div style={{ position: 'relative', height: 14 }}>
-            {markers.map((m) => (
-              <div
-                key={m.id}
-                title={`${m.date}: ${m.label}`}
-                style={{
-                  position: 'absolute',
-                  left: `${m.pct}%`,
-                  top: 0,
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: m.source === 'ai' ? 'var(--insight)' : 'var(--brand)',
-                  transform: 'translateX(-50%)',
-                }}
+        {readings.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+            No daily history yet for {tree.name} — real soil sensors went live 2026-08-18, and daily rollups are written once a day. Check back tomorrow.
+          </p>
+        ) : (
+          <>
+            <div style={{ position: 'relative', marginBottom: 8 }}>
+              <div style={{ position: 'relative', height: 14 }}>
+                {markers.map((m) => (
+                  <div
+                    key={m.id}
+                    title={`${m.date}: ${m.label}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${m.pct}%`,
+                      top: 0,
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: m.source === 'ai' ? 'var(--insight)' : 'var(--brand)',
+                      transform: 'translateX(-50%)',
+                    }}
+                  />
+                ))}
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, readings.length - 1)}
+                value={index}
+                onChange={(e) => setIndex(Number(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--ink)' }}
               />
-            ))}
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={readings.length - 1}
-            value={index}
-            onChange={(e) => setIndex(Number(e.target.value))}
-            style={{ width: '100%', accentColor: 'var(--ink)' }}
-          />
-        </div>
+            </div>
 
-        <div className="rgrid-4" style={{ gap: 16, marginTop: 16 }}>
-          <MetricValue label="Date" value={reading.date} />
-          <MetricValue
-            label="Soil moisture"
-            value={reading.soilMoistureAvg}
-            unit="%"
-            delta={moistureInRange ? 'In range' : 'Out of range'}
-            deltaTone={moistureInRange ? 'ok' : 'watch'}
-            tooltip={metricInfo.soilMoisture}
-          />
-          <MetricValue label="Soil temp" value={formatTemp(reading.soilTempAvg, system)} unit={tempUnit(system)} tooltip={metricInfo.soilTemp} />
-          <MetricValue
-            label="EC"
-            value={reading.soilEcAvg}
-            unit="mS/cm"
-            delta={ecInRange ? 'In range' : 'Elevated'}
-            deltaTone={ecInRange ? 'ok' : 'watch'}
-            tooltip={metricInfo.ec}
-          />
-        </div>
+            {reading && (
+              <div className="rgrid-4" style={{ gap: 16, marginTop: 16 }}>
+                <MetricValue label="Date" value={reading.date} />
+                <MetricValue
+                  label="Soil moisture"
+                  value={reading.soilMoistureAvg}
+                  unit="%"
+                  delta={moistureInRange ? 'In range' : 'Out of range'}
+                  deltaTone={moistureInRange ? 'ok' : 'watch'}
+                  tooltip={metricInfo.soilMoisture}
+                />
+                <MetricValue label="Soil temp" value={formatTemp(reading.soilTempAvg, system)} unit={tempUnit(system)} tooltip={metricInfo.soilTemp} />
+                <MetricValue
+                  label="EC"
+                  value={reading.soilEcAvg}
+                  unit="mS/cm"
+                  delta={ecInRange ? 'In range' : 'Elevated'}
+                  deltaTone={ecInRange ? 'ok' : 'watch'}
+                  tooltip={metricInfo.ec}
+                />
+              </div>
+            )}
+          </>
+        )}
       </Card>
 
       {markers.length > 0 && (

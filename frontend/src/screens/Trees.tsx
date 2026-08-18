@@ -1,5 +1,5 @@
 import { TreeCard } from '../components/TreeCard';
-import { trees, insightFor } from '../data/mockData';
+import { useTreeInsights } from '../hooks/useTreeInsights';
 import type { Status } from '../data/types';
 
 const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
@@ -9,8 +9,9 @@ const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
 // the app that disagreed with everywhere else about which tree matters
 // most right now.
 export function Trees() {
-  const sorted = [...trees].sort((a, b) => rank[insightFor(a.id).status] - rank[insightFor(b.id).status]);
-  const needsAttention = sorted.filter((t) => insightFor(t.id).status !== 'ok').length;
+  const { loading, trees, insightByTreeId, analyses, dailyReadingsByTree } = useTreeInsights();
+  const sorted = [...trees].sort((a, b) => rank[(insightByTreeId[a.id]?.status ?? 'ok')] - rank[(insightByTreeId[b.id]?.status ?? 'ok')]);
+  const needsAttention = sorted.filter((t) => (insightByTreeId[t.id]?.status ?? 'ok') !== 'ok').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1000 }}>
@@ -18,13 +19,16 @@ export function Trees() {
         <h1 style={{ fontSize: 24 }}>Trees</h1>
         <p style={{ color: 'var(--ink-soft)', marginTop: 4, fontSize: 14 }}>
           {trees.length} trees, each a live digital twin
-          {needsAttention > 0 ? ` — ${needsAttention} need${needsAttention === 1 ? 's' : ''} attention, shown first.` : ' — all stable.'}
+          {loading ? ' — loading current readings…' : needsAttention > 0 ? ` — ${needsAttention} need${needsAttention === 1 ? 's' : ''} attention, shown first.` : ' — all stable.'}
         </p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
-        {sorted.map((tree) => (
-          <TreeCard key={tree.id} tree={tree} />
-        ))}
+        {sorted.map((tree) => {
+          const insight = insightByTreeId[tree.id];
+          const analysis = analyses[tree.id];
+          if (!insight || !analysis) return null;
+          return <TreeCard key={tree.id} tree={tree} insight={insight} analysis={analysis} dailyReadings={dailyReadingsByTree[tree.id] ?? []} />;
+        })}
       </div>
     </div>
   );

@@ -5,7 +5,15 @@ type SituationalHeaderProps = {
   freshnessLabel: string;
   freshnessStale: boolean;
   hasLiveConditions: boolean;
+  treesWithLiveReading: number;
 };
+
+function treeReadingsLabel(treesWithLiveReading: number, treeCount: number): { text: string; tone: 'ok' | 'watch' } {
+  if (treeCount === 0) return { text: 'Tree readings: —', tone: 'watch' };
+  if (treesWithLiveReading === treeCount) return { text: 'Tree readings: live', tone: 'ok' };
+  if (treesWithLiveReading === 0) return { text: 'Tree readings: no live data yet', tone: 'watch' };
+  return { text: `Tree readings: ${treesWithLiveReading} of ${treeCount} live`, tone: 'watch' };
+}
 
 // Replaces the old "Good morning/afternoon" greeting with a stated
 // conclusion (spec 6.1) — the first thing a user reads should answer
@@ -21,7 +29,8 @@ function conclusion(urgentCount: number, watchCount: number): string {
   return 'Your grove is stable';
 }
 
-export function SituationalHeader({ urgentCount, watchCount, treeCount, freshnessLabel, freshnessStale, hasLiveConditions }: SituationalHeaderProps) {
+export function SituationalHeader({ urgentCount, watchCount, treeCount, freshnessLabel, freshnessStale, hasLiveConditions, treesWithLiveReading }: SituationalHeaderProps) {
+  const readings = treeReadingsLabel(treesWithLiveReading, treeCount);
   return (
     <div>
       <div className="eyebrow" style={{ marginBottom: 6 }}>
@@ -35,8 +44,8 @@ export function SituationalHeader({ urgentCount, watchCount, treeCount, freshnes
         <span className={`mono status-${hasLiveConditions ? (freshnessStale ? 'watch' : 'ok') : 'watch'}`} style={{ fontSize: 12 }}>
           {hasLiveConditions ? freshnessLabel : 'No live data'}
         </span>
-        <span className="mono" style={{ color: 'var(--watch)', fontSize: 12 }}>
-          Tree readings: demo data
+        <span className={`mono status-${readings.tone}`} style={{ fontSize: 12 }}>
+          {readings.text}
         </span>
       </p>
     </div>

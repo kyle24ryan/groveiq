@@ -7,7 +7,8 @@ import { ReadingChart } from '../components/ReadingChart';
 import { InsightPanel } from '../components/InsightPanel';
 import { InfoTooltip } from '../components/InfoTooltip';
 import { metricInfo } from '../data/metricInfo';
-import { trees, speciesReference, dailyReadingsFor, insightFor, milestonesFor, lastWateredFor } from '../data/mockData';
+import { trees, speciesReference, milestonesFor, lastWateredFor } from '../data/mockData';
+import { useTreeInsights } from '../hooks/useTreeInsights';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, formatTemp, tempUnit } from '../lib/units';
 import {
@@ -31,6 +32,7 @@ export function TreeDetail() {
   const { system } = useUnits();
   const { treeId } = useParams<{ treeId: string }>();
   const tree = trees.find((t) => t.id === treeId);
+  const treeInsights = useTreeInsights();
 
   const [photoAnalyses, setPhotoAnalyses] = useState<PhotoAnalysis[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -211,10 +213,22 @@ export function TreeDetail() {
     );
   }
 
-  const insight = insightFor(tree.id);
-  const readings = dailyReadingsFor(tree.id);
+  // Real per-tree data (shared with every other screen via
+  // useTreeInsights) replaces mockData.ts's insightFor()/dailyReadingsFor()
+  // -- previously independent computations that could disagree with what
+  // the rest of the app showed for the same tree.
+  const insight = treeInsights.insightByTreeId[tree.id] ?? {
+    id: `${tree.id}-loading`,
+    treeId: tree.id,
+    status: 'ok' as const,
+    title: 'GroveIQ: loading…',
+    evidence: 'Loading current sensor reading…',
+    ts: new Date().toISOString(),
+  };
+  const analysis = treeInsights.analyses[tree.id];
+  const readings = treeInsights.dailyReadingsByTree[tree.id] ?? [];
   const milestones = milestonesFor(tree.id);
-  const latest = readings[readings.length - 1];
+  const latest = analysis?.latest ?? { date: '', soilMoistureAvg: 0, soilMoistureMin: 0, soilMoistureMax: 0, soilTempAvg: 0, soilEcAvg: 0 };
   const species = speciesReference.find((s) => s.species === tree.species);
   const sibling = trees.find((t) => t.species === tree.species && t.id !== tree.id);
   const lastWatered = lastWateredFor(tree.id);
@@ -233,8 +247,9 @@ export function TreeDetail() {
   const potSizeLiters = profile ? profile.pot_size_liters : tree.potSizeLiters;
   const notes = profile ? profile.notes : tree.notes;
 
-  const moistureInRange = latest.soilMoistureAvg >= moistureLow && latest.soilMoistureAvg <= moistureHigh;
-  const ecInRange = latest.soilEcAvg <= ecThresholdHigh;
+  const hasCurrentReading = analysis?.hasCurrentReading ?? false;
+  const moistureInRange = hasCurrentReading && latest.soilMoistureAvg >= moistureLow && latest.soilMoistureAvg <= moistureHigh;
+  const ecInRange = hasCurrentReading && latest.soilEcAvg <= ecThresholdHigh;
   const readingsInDisplayUnits = readings.map((r) => ({ ...r, soilTempAvg: convertTemp(r.soilTempAvg, system) }));
 
   return (
@@ -306,18 +321,25 @@ export function TreeDetail() {
           <Card>
             <MetricValue
               label="Soil moisture"
-              value={latest.soilMoistureAvg}
-              unit="%"
-              delta={moistureInRange ? 'In range' : 'Out of range'}
-              deltaTone={moistureInRange ? 'ok' : 'watch'}
+              value={hasCurrentReading ? latest.soilMoistureAvg : '—'}
+              unit={hasCurrentReading ? '%' : undefined}
+              delta={hasCurrentReading ? (moistureInRange ? 'In range' : 'Out of range') : 'No recent reading'}
+              deltaTone={hasCurrentReading ? (moistureInRange ? 'ok' : 'watch') : 'watch'}
               tooltip={metricInfo.soilMoisture}
             />
           </Card>
           <Card>
-            <MetricValue label="EC" value={latest.soilEcAvg} unit="mS/cm" delta={ecInRange ? 'In range' : 'Elevated'} deltaTone={ecInRange ? 'ok' : 'watch'} tooltip={metricInfo.ec} />
+            <MetricValue
+              label="EC"
+              value={hasCurrentReading ? latest.soilEcAvg : '—'}
+              unit={hasCurrentReading ? 'mS/cm' : undefined}
+              delta={hasCurrentReading ? (ecInRange ? 'In range' : 'Elevated') : undefined}
+              deltaTone={hasCurrentReading ? (ecInRange ? 'ok' : 'watch') : 'neutral'}
+              tooltip={metricInfo.ec}
+            />
           </Card>
           <Card>
-            <MetricValue label="Soil temp" value={formatTemp(latest.soilTempAvg, system)} unit={tempUnit(system)} tooltip={metricInfo.soilTemp} />
+            <MetricValue label="Soil temp" value={hasCurrentReading ? formatTemp(latest.soilTempAvg, system) : '—'} unit={hasCurrentReading ? tempUnit(system) : undefined} tooltip={metricInfo.soilTemp} />
           </Card>
           <Card>
             <MetricValue label="Last watered" value={lastWatered} tooltip={metricInfo.lastWatered} />

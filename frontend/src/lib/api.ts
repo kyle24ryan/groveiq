@@ -63,6 +63,49 @@ export type PhotoAnalysis = {
   ts: string;
 };
 
+export type SoilReading = {
+  id: number;
+  tree_id: string;
+  ts: string;
+  soil_moisture_pct: number | null;
+  soil_temp_c: number | null;
+  soil_ec: number | null;
+};
+
+export async function fetchSoilReadings(treeId: string, hours = 720): Promise<SoilReading[]> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/soil-readings?hours=${hours}`);
+  if (!res.ok) throw new Error(`soil-readings fetch failed: ${res.status}`);
+  const body = (await res.json()) as { readings: SoilReading[] };
+  return body.readings;
+}
+
+// Shape matches daily_readings (schema.sql) -- real daily rollups, written
+// by the 13:00 UTC cron (src/dailyRollup.ts). Distinct from SoilReading's
+// 5-min raw granularity: this is for trend charts/history, soil-readings
+// is for "what's the current reading right now."
+export type DailyReadingRow = {
+  date: string;
+  soil_moisture_avg: number | null;
+  soil_moisture_min: number | null;
+  soil_moisture_max: number | null;
+  soil_temp_avg: number | null;
+  soil_ec_avg: number | null;
+  outdoor_temp_avg: number | null;
+  outdoor_temp_min: number | null;
+  humidity_avg: number | null;
+  wind_max: number | null;
+  rain_total: number | null;
+  black_globe_max: number | null;
+  pm25_avg: number | null;
+};
+
+export async function fetchDailyReadings(treeId: string, days = 30): Promise<DailyReadingRow[]> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/daily-readings?days=${days}`);
+  if (!res.ok) throw new Error(`daily-readings fetch failed: ${res.status}`);
+  const body = (await res.json()) as { readings: DailyReadingRow[] };
+  return body.readings;
+}
+
 export async function fetchTreeAnalyses(treeId: string): Promise<PhotoAnalysis[]> {
   const res = await apiFetch(`${API_BASE}/trees/${treeId}/analyses`);
   if (!res.ok) throw new Error(`analyses fetch failed: ${res.status}`);
@@ -433,6 +476,13 @@ export type TreeProfileEditableFields = Partial<
     | 'dormancy_soil_temp_c'
   >
 >;
+
+export async function fetchAllTreeProfiles(): Promise<TreeProfile[]> {
+  const res = await apiFetch(`${API_BASE}/trees`);
+  if (!res.ok) throw new Error(`trees fetch failed: ${res.status}`);
+  const body = (await res.json()) as { trees: TreeProfile[] };
+  return body.trees;
+}
 
 export async function fetchTreeProfile(treeId: string): Promise<TreeProfile> {
   const res = await apiFetch(`${API_BASE}/trees/${treeId}`);

@@ -1,17 +1,26 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { Card } from '../Card';
 import { StatusBadge } from '../StatusBadge';
-import { analyzeTree, insightFor } from '../../data/mockData';
 import { useUnits } from '../../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../../lib/units';
-import type { Tree } from '../../data/types';
+import type { Tree, Insight } from '../../data/types';
+import type { RealTreeAnalysis } from '../../data/realTreeAnalysis';
+
+type CollectionStatusMatrixProps = {
+  trees: Tree[];
+  analyses: Record<string, RealTreeAnalysis>;
+  insightByTreeId: Record<string, Insight>;
+};
 
 // A dense comparison table replacing the repeated healthy-tree cards on
 // Overview (spec 6.5) — one row per tree, ordered worst-first, with only
 // the specific out-of-range cell highlighted rather than the whole row.
-// Every value comes from analyzeTree()/insightFor(), the same functions
-// behind the sidebar dot and Tree Detail, so this can't disagree with them.
-export function CollectionStatusMatrix({ trees }: { trees: Tree[] }) {
+// `analyses`/`insightByTreeId` are passed in (shared with every other
+// screen via useTreeInsights) rather than recomputed here -- this
+// component previously called analyzeTree()/insightFor() directly, its
+// own independent computation that could disagree with what the rest of
+// the app was showing for the same tree.
+export function CollectionStatusMatrix({ trees, analyses, insightByTreeId }: CollectionStatusMatrixProps) {
   const { system } = useUnits();
   const navigate = useNavigate();
 
@@ -32,8 +41,9 @@ export function CollectionStatusMatrix({ trees }: { trees: Tree[] }) {
           </thead>
           <tbody>
             {trees.map((tree) => {
-              const a = analyzeTree(tree.id);
-              const insight = insightFor(tree.id);
+              const a = analyses[tree.id];
+              const insight = insightByTreeId[tree.id];
+              if (!a || !insight) return null;
               const moistureOut = a.belowThreshold || a.aboveThreshold;
               return (
                 <tr
@@ -52,16 +62,16 @@ export function CollectionStatusMatrix({ trees }: { trees: Tree[] }) {
                     </div>
                   </td>
                   <td className="mono" style={{ padding: '10px 12px', color: moistureOut ? (a.status === 'urgent' ? 'var(--urgent)' : 'var(--watch)') : undefined }}>
-                    {a.latest.soilMoistureAvg}%
+                    {a.hasCurrentReading ? `${a.latest.soilMoistureAvg}%` : '—'}
                   </td>
                   <td className={`mono ${a.decliningFast ? `status-${a.status}` : ''}`} style={{ padding: '10px 12px' }}>
-                    {a.changePct > 0 ? '↑' : '↓'} {Math.abs(a.changePct)}%
+                    {a.hasCurrentReading ? `${a.changePct > 0 ? '↑' : '↓'} ${Math.abs(a.changePct)}%` : '—'}
                   </td>
                   <td className="mono" style={{ padding: '10px 12px' }}>
-                    {a.latest.soilEcAvg}
+                    {a.hasCurrentReading ? a.latest.soilEcAvg : '—'}
                   </td>
                   <td className="mono" style={{ padding: '10px 12px' }}>
-                    {formatTemp(a.latest.soilTempAvg, system)}{tempUnit(system)}
+                    {a.hasCurrentReading ? `${formatTemp(a.latest.soilTempAvg, system)}${tempUnit(system)}` : '—'}
                   </td>
                   <td className="mono" style={{ padding: '10px 12px', color: a.daysToThreshold != null && a.daysToThreshold < 2 ? 'var(--urgent)' : undefined }}>
                     {a.daysToThreshold != null ? `~${a.daysToThreshold}d` : '—'}

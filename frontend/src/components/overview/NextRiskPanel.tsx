@@ -1,11 +1,11 @@
 import { Card } from '../Card';
-import { analyzeTree } from '../../data/mockData';
-import type { Tree, Insight } from '../../data/types';
+import type { Insight } from '../../data/types';
+import type { RealTreeAnalysis } from '../../data/realTreeAnalysis';
 import type { ForecastDay, RegionalAqi } from '../../lib/api';
 
 type NextRiskPanelProps = {
-  trees: Tree[];
-  priorityInsight: Insight;
+  analyses: RealTreeAnalysis[];
+  priorityInsight: Insight | undefined;
   priorityTreeName?: string;
   demandLabel: string;
   forecast: ForecastDay[];
@@ -14,20 +14,23 @@ type NextRiskPanelProps = {
 
 // Up to four time-indexed items (spec 6.6) — never padded with neutral
 // forecast facts just to fill the panel, so an item is omitted rather than
-// invented when there's genuinely nothing to say.
-export function NextRiskPanel({ trees, priorityInsight, priorityTreeName, demandLabel, forecast, regionalAqi }: NextRiskPanelProps) {
+// invented when there's genuinely nothing to say. `analyses` is passed in
+// (shared with every other screen via useTreeInsights) rather than
+// recomputed here -- this component previously called analyzeTree()
+// directly, its own independent computation that could disagree with
+// what the rest of the app was showing for the same tree.
+export function NextRiskPanel({ analyses, priorityInsight, priorityTreeName, demandLabel, forecast, regionalAqi }: NextRiskPanelProps) {
   const items: { label: string; value: string }[] = [];
 
-  if (priorityInsight.status !== 'ok' && priorityInsight.action) {
+  if (priorityInsight && priorityInsight.status !== 'ok' && priorityInsight.action) {
     items.push({ label: 'Next check', value: `${priorityTreeName ?? 'Priority tree'}: ${priorityInsight.action}` });
   }
 
   items.push({ label: 'Next 24h', value: `${demandLabel} water demand expected, peak 1-5pm.` });
 
-  const analyses = trees.map((t) => analyzeTree(t.id)).filter((a) => a.daysToThreshold != null);
-  analyses.sort((a, b) => (a.daysToThreshold ?? Infinity) - (b.daysToThreshold ?? Infinity));
-  if (analyses[0]) {
-    const a = analyses[0];
+  const withThreshold = analyses.filter((a) => a.daysToThreshold != null).sort((a, b) => (a.daysToThreshold ?? Infinity) - (b.daysToThreshold ?? Infinity));
+  if (withThreshold[0]) {
+    const a = withThreshold[0];
     items.push({ label: 'Threshold crossing', value: `${a.tree.name} reaches its threshold in ~${a.daysToThreshold}d at the current rate.` });
   }
 
