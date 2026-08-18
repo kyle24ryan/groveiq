@@ -293,3 +293,29 @@ input:focus-visible,
     transition: none;
   }
 }
+
+/* Mapbox GL's popup ships its own white-box styling by default; override
+   to inherit the app's theme so it doesn't look like a foreign widget in
+   dark mode. */
+.mapboxgl-popup-content {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-family: var(--font-sans);
+  padding: 10px 12px;
+}
+
+.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
+  border-top-color: var(--surface);
+}
+.mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+  border-bottom-color: var(--surface);
+}
+.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: var(--surface);
+}
+.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: var(--surface);
+}

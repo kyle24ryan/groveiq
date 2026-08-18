@@ -4,7 +4,50 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-15 (ESP32 camera-capture firmware verified live on real hardware).
+Last updated: 2026-08-17 (Mapbox GroveMap enhancements: dark mode, popup, particle wind animation).
+
+## Mapbox GroveMap enhancements (2026-08-17)
+
+Prompted by "where can we make it better?" — audited the existing native
+map integration (Overview's Spatial Evidence panel only; nowhere else in
+the app uses Mapbox) and shipped what was actually feasible for free:
+
+- **Dark mode fix** — `GroveMap.tsx` was hardcoded to `light-v11`
+  regardless of theme. Now picks `light-v11`/`dark-v11` on mount and
+  live-switches via a `matchMedia` listener, matching how the rest of the
+  app already follows `prefers-color-scheme` with no manual toggle.
+- **Click popup on the grove marker** — shows live temp/wind/AQI at a
+  glance without switching layers. Content built in `SpatialEvidencePanel`
+  (unit-system-aware formatting already lives there) and passed down as
+  HTML; `GroveMap` stays presentation-only. Custom `.mapboxgl-popup-*` CSS
+  added to `theme.css` so it inherits the app's palette instead of
+  Mapbox's default white box. **Real bug found and fixed**: a 4th
+  "freshness" row caused the popup to clip against the map card's
+  rounded-corner `overflow: hidden` edge, since the grove marker is always
+  exactly vertically centered (fixed map `center`) with only ~height/2 of
+  room below it — dropped to exactly temp/wind/AQI as scoped, which fits.
+- **Fullscreen control** — one line (`FullscreenControl`), verified present
+  via the accessibility tree (actual fullscreen transition doesn't fire
+  under browser-automation testing, expected and unrelated to app code).
+- **Animated wind particle stream** — replaces the static ring for "Wind
+  exposure" specifically (Air & smoke keeps its ring; wind gets particles
+  instead). Small dots animate outward from the grove marker along live
+  wind direction, via `requestAnimationFrame` + a GeoJSON source
+  `setData()` each frame, fading as they travel. Deliberately stays
+  anchored to the grove's single point reading rather than a fabricated
+  regional flow field (same "critical data limitation" principle as the
+  ring it replaces) — distance scales loosely with wind speed for visual
+  distinction, not real-world scale. Respects `prefers-reduced-motion`
+  (renders fixed, non-animated particle positions instead). Verified live
+  with temporarily-forced wind values in local dev (no live conditions
+  data available locally due to the documented cross-origin Access
+  limitation).
+- **PurpleAir API key added** (`PURPLEAIR_API_KEY` Worker secret, read-key
+  only, `develop.purpleair.com`) — **not yet wired into any code.** Plan:
+  real nearby-sensor markers on the native map, replacing/supplementing
+  the "Air & smoke" ring, once actually implemented. Windy stays an
+  iframe regardless (`RegionalMaps.tsx`) — no free keyless alternative
+  exists for gridded wind model data.
 
 ## ESP32 camera-capture firmware + security incident (2026-08-14)
 

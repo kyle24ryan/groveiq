@@ -1,7 +1,7 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useMemo } from 'react';
 import { Card } from '../Card';
 import { useUnits } from '../../contexts/UnitsContext';
-import { formatWindSpeed, windSpeedUnit } from '../../lib/units';
+import { formatTemp, tempUnit, formatWindSpeed, windSpeedUnit } from '../../lib/units';
 import { aqiCategory } from '../../lib/aqi';
 import type { Insight, Tree } from '../../data/types';
 import type { ConditionsReading, RegionalAqi, ForecastDay } from '../../lib/api';
@@ -46,6 +46,27 @@ export function SpatialEvidencePanel({ insight, tree, latest, regionalAqi, forec
   const localAqi = latest?.pm25_aqi ?? null;
   const frostDay = forecast?.find((d) => d.frost_risk === 1);
 
+  // Click-popup content for the grove marker -- a quick-glance dashboard
+  // rather than requiring a layer switch just to see current conditions.
+  // Kept to exactly temp/wind/AQI (no freshness line): the grove marker is
+  // always dead-center on the map (it's the map's fixed center point), so
+  // the popup only has ~height/2 of vertical room below it before hitting
+  // the map card's rounded-corner overflow:hidden edge -- a 4th line
+  // measured out to clip there in testing.
+  const popupHtml = useMemo(() => {
+    const tempRow = latest?.outdoor_temp_c != null ? `${formatTemp(latest.outdoor_temp_c, system)}${tempUnit(system)}` : '—';
+    const windRow = windMph != null ? `${formatWindSpeed(windMph, system)} ${windSpeedUnit(system)}${windDirDeg != null ? ` ${compassLabel(windDirDeg)}` : ''}` : '—';
+    const aqiRow = localAqi != null ? `${Math.round(localAqi)} · ${aqiCategory(localAqi).label}` : '—';
+    return (
+      `<div style="font-size:12.5px;min-width:140px;">` +
+      `<div style="font-weight:600;margin-bottom:6px;">Grove — current conditions</div>` +
+      `<div style="display:flex;justify-content:space-between;gap:10px;"><span>Temp</span><span>${tempRow}</span></div>` +
+      `<div style="display:flex;justify-content:space-between;gap:10px;"><span>Wind</span><span>${windRow}</span></div>` +
+      `<div style="display:flex;justify-content:space-between;gap:10px;"><span>AQI</span><span>${aqiRow}</span></div>` +
+      `</div>`
+    );
+  }, [latest, windMph, windDirDeg, localAqi, system]);
+
   return (
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
@@ -77,7 +98,7 @@ export function SpatialEvidencePanel({ insight, tree, latest, regionalAqi, forec
       </div>
 
       <Suspense fallback={<div style={{ height: 260, background: 'var(--canvas)', border: '1px solid var(--border)', borderRadius: 8 }} />}>
-        <GroveMap layer={layer} windDirDeg={windDirDeg} windMph={windMph} localAqi={localAqi} onSourceInfo={setRadarInfo} />
+        <GroveMap layer={layer} windDirDeg={windDirDeg} windMph={windMph} localAqi={localAqi} onSourceInfo={setRadarInfo} popupHtml={popupHtml} />
       </Suspense>
 
       <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>

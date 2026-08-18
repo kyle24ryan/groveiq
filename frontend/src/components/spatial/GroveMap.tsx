@@ -14,6 +14,10 @@ type GroveMapProps = {
   localAqi?: number | null;
   height?: number;
   onSourceInfo?: (info: { label: string; freshness: string | null } | null) => void;
+  /** Pre-formatted HTML for the grove marker's click popup -- built by the
+   * parent since it already has unit-system-aware formatting helpers in
+   * scope; this component stays presentation-only. */
+  popupHtml?: string;
 };
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
@@ -21,6 +25,10 @@ const RAIN_SOURCE_ID = 'rainviewer-radar';
 const RAIN_LAYER_ID = 'rainviewer-radar-layer';
 const IMPACT_RING_SOURCE_ID = 'grove-impact-ring';
 const IMPACT_RING_LAYER_ID = 'grove-impact-ring-layer';
+const WIND_PARTICLE_SOURCE_ID = 'grove-wind-particles';
+const WIND_PARTICLE_LAYER_ID = 'grove-wind-particles-layer';
+const WIND_PARTICLE_COUNT = 7;
+const WIND_PARTICLE_LIFE_MS = 2200;
 
 function ringColorForWind(mph: number | null | undefined): string {
   if (mph == null) return '#9CA3AF';
@@ -44,15 +52,17 @@ function mapStyleForScheme(isDark: boolean): string {
 // gridded overlay (RainViewer's public, keyless radar tile API) -- the
 // repo has a single point location and point-in-time readings for
 // wind/AQI, not a gridded regional dataset for those, so per spec 6.3's
-// "critical data limitation" section, Wind exposure/Air & smoke render as
-// an interpretive colored ring around the grove marker (real point data,
-// honestly presented as a point) rather than an invented regional
-// contour. Full provider layer switching (Windy/PurpleAir) stays in
-// Environment's "Regional source maps" disclosure.
-export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, onSourceInfo }: GroveMapProps) {
+// "critical data limitation" section, "Air & smoke" renders as an
+// interpretive colored ring and "Wind exposure" as an animated particle
+// stream, both anchored to the grove marker (real point data, honestly
+// presented as a point) rather than an invented regional contour. Full
+// provider layer switching (Windy/PurpleAir) stays in Environment's
+// "Regional source maps" disclosure.
+export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, onSourceInfo, popupHtml }: GroveMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const windMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const groveMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [styleLoaded, setStyleLoaded] = useState(false);
 
   useEffect(() => {
@@ -73,12 +83,17 @@ export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, o
       console.error('GroveMap:', e.error ?? e);
     });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+    map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
     map.on('style.load', () => setStyleLoaded(true));
 
     const groveEl = document.createElement('div');
-    groveEl.setAttribute('aria-label', 'Grove location');
-    groveEl.style.cssText = 'width:14px;height:14px;border-radius:50%;background:#2F6D4F;border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.15);z-index:2;position:relative;';
-    new mapboxgl.Marker({ element: groveEl }).setLngLat([GROVE_LON, GROVE_LAT]).addTo(map);
+    groveEl.setAttribute('aria-label', 'Grove location — click for current conditions');
+    groveEl.style.cssText = 'width:14px;height:14px;border-radius:50%;background:#2F6D4F;border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.15);z-index:2;position:relative;cursor:pointer;';
+    const groveMarker = new mapboxgl.Marker({ element: groveEl })
+      .setLngLat([GROVE_LON, GROVE_LAT])
+      .setPopup(new mapboxgl.Popup({ offset: 16, closeButton: false, maxWidth: '220px' }))
+      .addTo(map);
+    groveMarkerRef.current = groveMarker;
 
     // The rest of the app follows the OS's prefers-color-scheme live (pure
     // CSS, no toggle) -- match that here rather than freezing the map's
@@ -97,9 +112,17 @@ export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, o
       darkSchemeQuery.removeEventListener('change', handleSchemeChange);
       map.remove();
       mapRef.current = null;
+      groveMarkerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the popup's content current as live conditions update -- built by
+  // the parent (unit-system-aware formatting already lives there) rather
+  // than duplicating that logic in this presentation-only component.
+  useEffect(() => {
+    groveMarkerRef.current?.getPopup()?.setHTML(popupHtml ?? 'No live conditions yet.');
+  }, [popupHtml]);
 
   // Wind vector marker: shown for the "impact" layer (tied to whatever
   // the active priority signal cares about) and always for "wind".
@@ -126,8 +149,10 @@ export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, o
     windMarkerRef.current.setRotation(windDirDeg! + 180);
   }, [layer, windDirDeg]);
 
-  // Impact ring: a colored circle around the grove marker for "wind" and
-  // "air" layers, sized/colored from real point data at the grove.
+  // Impact ring: a colored circle around the grove marker for the "air"
+  // layer, sized/colored from the real point AQI reading at the grove.
+  // ("wind" used to share this ring too; it now gets the animated particle
+  // stream below instead, which conveys direction/speed better.)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !styleLoaded) return;
@@ -137,12 +162,12 @@ export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, o
       if (map.getSource(IMPACT_RING_SOURCE_ID)) map.removeSource(IMPACT_RING_SOURCE_ID);
     };
 
-    if (layer !== 'wind' && layer !== 'air') {
+    if (layer !== 'air') {
       removeRing();
       return;
     }
 
-    const color = layer === 'wind' ? ringColorForWind(windMph) : ringColorForAqi(localAqi);
+    const color = ringColorForAqi(localAqi);
     const geojson: Feature<Point> = { type: 'Feature', geometry: { type: 'Point', coordinates: [GROVE_LON, GROVE_LAT] }, properties: {} };
 
     if (!map.getSource(IMPACT_RING_SOURCE_ID)) {
@@ -168,7 +193,96 @@ export function GroveMap({ layer, windDirDeg, windMph, localAqi, height = 260, o
     return () => {
       // Only tear down on unmount/layer-change cleanup, not every paint tweak.
     };
-  }, [layer, windMph, localAqi, styleLoaded]);
+  }, [layer, localAqi, styleLoaded]);
+
+  // Wind particle stream: small dots animate outward from the grove marker
+  // along the live wind direction, fading as they travel. This is a
+  // stylized indicator, not a to-scale simulation -- like the AQI ring, it
+  // deliberately stays anchored to the grove's single point reading rather
+  // than implying a gridded regional flow field we don't have data for
+  // (see this file's top comment on the "critical data limitation").
+  // Distance traveled scales loosely with wind speed so calm vs. gusty
+  // reads as visually distinct, not to convey real-world scale.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleLoaded) return;
+
+    const removeParticles = () => {
+      if (map.getLayer(WIND_PARTICLE_LAYER_ID)) map.removeLayer(WIND_PARTICLE_LAYER_ID);
+      if (map.getSource(WIND_PARTICLE_SOURCE_ID)) map.removeSource(WIND_PARTICLE_SOURCE_ID);
+    };
+
+    if (layer !== 'wind' || windDirDeg == null) {
+      removeParticles();
+      return;
+    }
+
+    const color = ringColorForWind(windMph);
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    // Wind direction is "from" (met convention); particles travel toward
+    // where the wind is blowing, same convention as the arrow marker above.
+    const bearingRad = toRad(windDirDeg + 180);
+    const dx = Math.sin(bearingRad);
+    const dy = Math.cos(bearingRad);
+    const latCos = Math.cos(toRad(GROVE_LAT));
+    const maxOffsetDeg = 0.0018 + Math.min(windMph ?? 0, 40) * 0.00006;
+
+    const emptyGeojson = { type: 'FeatureCollection' as const, features: [] as Feature<Point>[] };
+    map.addSource(WIND_PARTICLE_SOURCE_ID, { type: 'geojson', data: emptyGeojson });
+    map.addLayer({
+      id: WIND_PARTICLE_LAYER_ID,
+      type: 'circle',
+      source: WIND_PARTICLE_SOURCE_ID,
+      paint: {
+        'circle-radius': 4,
+        'circle-color': color,
+        'circle-opacity': ['get', 'opacity'],
+      },
+    });
+
+    const featuresAt = (progressForIndex: (i: number) => number): Feature<Point>[] =>
+      Array.from({ length: WIND_PARTICLE_COUNT }, (_, i) => {
+        const t = progressForIndex(i);
+        const dist = maxOffsetDeg * t;
+        const lon = GROVE_LON + (dx * dist) / (latCos || 1);
+        const lat = GROVE_LAT + dy * dist;
+        return {
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [lon, lat] },
+          properties: { opacity: 0.7 * (1 - t) },
+        };
+      });
+
+    const source = () => map.getSource(WIND_PARTICLE_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+
+    // Respect prefers-reduced-motion: show the particles at fixed, evenly
+    // spaced positions instead of continuously animating.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      source()?.setData({ type: 'FeatureCollection', features: featuresAt((i) => i / WIND_PARTICLE_COUNT) });
+      return removeParticles;
+    }
+
+    let rafId: number;
+    const startedAt = performance.now();
+    const frame = () => {
+      const now = performance.now();
+      const features = featuresAt((i) => {
+        // Stagger each particle's phase so they form a continuous stream
+        // rather than all pulsing in lockstep.
+        const phaseOffsetMs = (WIND_PARTICLE_LIFE_MS / WIND_PARTICLE_COUNT) * i;
+        const age = (now - startedAt + phaseOffsetMs) % WIND_PARTICLE_LIFE_MS;
+        return age / WIND_PARTICLE_LIFE_MS; // 0 (at grove) -> 1 (fully traveled)
+      });
+      source()?.setData({ type: 'FeatureCollection', features });
+      rafId = requestAnimationFrame(frame);
+    };
+    rafId = requestAnimationFrame(frame);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      removeParticles();
+    };
+  }, [layer, windDirDeg, windMph, styleLoaded]);
 
   // Precipitation: RainViewer's public radar tile API (no key required).
   useEffect(() => {
