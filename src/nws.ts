@@ -116,4 +116,75 @@ export async function writeForecasts(env: Env, days: DailyForecast[]): Promise<v
   }
 }
 
+// NWS active alerts (watches/warnings/advisories) for the grove's point
+// location. Same free/keyless api.weather.gov used for the forecast above.
+// Alerts are polygon-based when the issuing office drew one (typically
+// severe thunderstorm/tornado warnings), otherwise they're issued against
+// county/zone geometry and the API returns geometry: null -- callers must
+// not fabricate a shape in that case, just say the alert applies to the
+// area without drawing anything on the map.
+export type NwsAlertGeometry = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown } | null;
+
+export type NwsAlert = {
+  id: string;
+  event: string;
+  severity: string;
+  certainty: string;
+  urgency: string;
+  headline: string | null;
+  areaDesc: string;
+  effective: string | null;
+  onset: string | null;
+  expires: string | null;
+  ends: string | null;
+  senderName: string;
+  // api.weather.gov's own canonical URL for this alert -- content-negotiates
+  // to a human-readable page in a browser, so it doubles as the "direct NWS
+  // link" without us guessing at a public alerts.weather.gov URL pattern.
+  webUrl: string;
+  geometry: NwsAlertGeometry;
+};
+
+type NwsAlertFeature = {
+  geometry: NwsAlertGeometry;
+  properties: {
+    id: string;
+    event: string;
+    severity: string;
+    certainty: string;
+    urgency: string;
+    headline: string | null;
+    areaDesc: string;
+    effective: string | null;
+    onset: string | null;
+    expires: string | null;
+    ends: string | null;
+    senderName: string;
+    ['@id']: string;
+  };
+};
+
+export async function fetchActiveAlerts(): Promise<NwsAlert[]> {
+  const data = (await nwsFetch(`https://api.weather.gov/alerts/active?point=${GROVE_LAT},${GROVE_LON}`)) as {
+    features?: NwsAlertFeature[];
+  };
+  const features = data.features ?? [];
+  return features.map((f) => ({
+    id: f.properties.id,
+    event: f.properties.event,
+    severity: f.properties.severity,
+    certainty: f.properties.certainty,
+    urgency: f.properties.urgency,
+    headline: f.properties.headline,
+    areaDesc: f.properties.areaDesc,
+    effective: f.properties.effective,
+    onset: f.properties.onset,
+    expires: f.properties.expires,
+    ends: f.properties.ends,
+    senderName: f.properties.senderName,
+    webUrl: f.properties['@id'],
+    geometry: f.geometry ?? null,
+  }));
+}
+
 export { GROVE_LAT, GROVE_LON };

@@ -22,7 +22,22 @@ export type AirNowObservation = {
   category: string | null;
   reportingArea: string | null;
   discussion: string | null;
+  // The calendar date (grove-local, YYYY-MM-DD) this forecast value is
+  // actually valid for -- see the timestamp-gap note below.
+  forecastDate: string | null;
 };
+
+// Grove-local (America/Los_Angeles) calendar date, not the Worker's UTC
+// clock date. AirNow's DateForecast field is the *forecast issuer's* local
+// date; comparing it against `new Date().toISOString().slice(0, 10)` (UTC)
+// is a latent bug -- harmless right at the current 13:00 UTC cron time
+// (which happens to fall on the same UTC/Pacific calendar date year-round),
+// but silently wrong for any other trigger time (a manual /api/debug/daily-job
+// call, or the cron ever being rescheduled), since UTC rolls to the next
+// date up to 8 hours before Pacific does.
+function groveLocalDateString(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
 
 // Verified against a real response from /aq/forecast/zipCode/ on
 // 2026-08-13 -- PascalCase, and the date field is DateForecast, not
@@ -52,9 +67,12 @@ export async function fetchAirNow(env: Env): Promise<AirNowObservation | null> {
   }
 
   const body = (await response.json()) as AirNowForecastRow[];
-  const today = new Date().toISOString().slice(0, 10);
-  // Prefer today's forecast; fall back to whatever's first if the date
-  // match misses (e.g. right at a day boundary).
+  const today = groveLocalDateString();
+  // Prefer today's (grove-local) forecast; fall back to whatever's first
+  // if the date match misses (e.g. right at a day boundary, or the
+  // forecast for today hasn't been issued yet). Either way, forecastDate
+  // below always records which day the chosen row is actually for, so a
+  // fallback pick is never silently presented as "today's" number.
   const pm25 = body.find((r) => r.ParameterName === 'PM2.5' && r.DateForecast === today) ?? body.find((r) => r.ParameterName === 'PM2.5');
   if (!pm25) return null;
 
@@ -63,13 +81,14 @@ export async function fetchAirNow(env: Env): Promise<AirNowObservation | null> {
     category: pm25.Category?.Name ?? null,
     reportingArea: pm25.ReportingArea ?? null,
     discussion: pm25.Discussion?.trim() ?? null,
+    forecastDate: pm25.DateForecast ?? null,
   };
 }
 
 export async function writeAirNowObservation(env: Env, obs: AirNowObservation): Promise<void> {
   await env.DB.prepare(
-    `INSERT INTO regional_air_quality (airnow_aqi, airnow_category, reporting_area, discussion) VALUES (?, ?, ?, ?)`
+    `INSERT INTO regional_air_quality (airnow_aqi, airnow_category, reporting_area, discussion, forecast_date) VALUES (?, ?, ?, ?, ?)`
   )
-    .bind(obs.aqi, obs.category, obs.reportingArea, obs.discussion)
+    .bind(obs.aqi, obs.category, obs.reportingArea, obs.discussion, obs.forecastDate)
     .run();
 }
