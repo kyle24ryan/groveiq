@@ -19,6 +19,7 @@ import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
 import { fetchNwsForecast, writeForecasts } from './nws';
 import { fetchAirNow, writeAirNowObservation } from './airnow';
 import { rollUpDailyReadings, yesterdayGroveLocalDateStr } from './dailyRollup';
+import { runDailyDiagnostics } from './dailyDiagnostic';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -157,6 +158,13 @@ export default {
       return Response.json({ date, ...result });
     }
 
+    // TODO: temporary, for testing the daily AI diagnostic on-demand
+    // instead of waiting for the 13:00 UTC cron.
+    if (url.pathname === '/api/debug/diagnostic') {
+      const result = await runDailyDiagnostics(env);
+      return Response.json(result);
+    }
+
     return new Response('GroveIQ API — Phase 0 skeleton', {
       headers: { 'content-type': 'text/plain' },
     });
@@ -173,15 +181,16 @@ export default {
     if (!reading) return; // credentials not configured
     await writeConditionsReading(env, reading);
     await evaluateConditionAlerts(env, reading.conditions);
-    // Soil sensors are physically installed and reporting (2026-08-18).
-    // writeSoilReadings() no-ops per-channel until soilChannels.ts's
-    // SOIL_CHANNEL_TREE_MAP is confirmed against the real install --
-    // currently all placeholders, so this is a no-op today, not dead code.
+    // Soil sensors are physically installed and reporting (2026-08-18);
+    // soilChannels.ts's SOIL_CHANNEL_TREE_MAP is confirmed against the
+    // real install, so this writes real per-tree soil_readings rows.
     await writeSoilReadings(env, reading);
   },
 };
 
-async function runDailyJob(env: Env): Promise<{ forecastDays: number; airnow: boolean; dailyReadingsRolledUp: number; errors: string[] }> {
+async function runDailyJob(
+  env: Env
+): Promise<{ forecastDays: number; airnow: boolean; dailyReadingsRolledUp: number; treesDiagnosed: number; errors: string[] }> {
   const errors: string[] = [];
   let forecastDays = 0;
   let airnow = false;
@@ -213,5 +222,16 @@ async function runDailyJob(env: Env): Promise<{ forecastDays: number; airnow: bo
     errors.push(`Daily rollup: ${String(err)}`);
   }
 
-  return { forecastDays, airnow, dailyReadingsRolledUp, errors };
+  // Runs after the rollup above so it can see that day's daily_readings
+  // history, not just the live soil_readings snapshot.
+  let treesDiagnosed = 0;
+  try {
+    const result = await runDailyDiagnostics(env);
+    treesDiagnosed = result.treesDiagnosed;
+    errors.push(...result.errors.map((e) => `Diagnostic ${e}`));
+  } catch (err) {
+    errors.push(`Daily diagnostic: ${String(err)}`);
+  }
+
+  return { forecastDays, airnow, dailyReadingsRolledUp, treesDiagnosed, errors };
 }

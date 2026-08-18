@@ -4,7 +4,67 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-18 (provisional substrate-aware soil moisture thresholds).
+Last updated: 2026-08-18 (daily per-tree AI diagnostic built; checklist swept for stale claims).
+
+## Daily per-tree AI diagnostic (2026-08-18)
+
+Closes the last open item from "Soil sensors installed" below — the
+guardrail comment in `src/claude.ts` blocking this was satisfied once both
+the backend (real `soil_readings`) and frontend (fully wired off mock
+data, same day) conditions were met.
+
+- `src/dailyDiagnostic.ts` (new) — `runDailyDiagnostics()`, called from the
+  existing 13:00 UTC cron after `rollUpDailyReadings()` so it has that
+  day's fresh trend history. For each tree with at least one real soil
+  reading, gathers the latest soil reading + up to 14 days of
+  `daily_readings` + species notes + current outdoor conditions, calls
+  Claude, and writes a `kind='sensor'` row into `analyses`. Trees with no
+  sensor data at all are skipped rather than diagnosed against unknowns.
+- `src/claude.ts` refactored: the shared "call Claude, parse a
+  `{status,summary,detail}` JSON response" logic that used to live only
+  inside `analyzeTreePhoto()` is now a private `callClaudeForDiagnosis()`
+  helper both functions use, and the type it returns is renamed
+  `Diagnosis` (was `VisionAnalysis`, no longer photo-specific). New
+  `diagnoseTreeSensorData()` builds the sensor-based prompt, carrying the
+  same honesty constraints as the rule-based engine it sits alongside
+  (`frontend/src/data/realTreeAnalysis.ts`): explicitly tells the model
+  the configured thresholds are provisional/substrate-uncalibrated, warns
+  it when the latest reading is stale (>1 hour old), and blocks any trend
+  claim below `MIN_DAYS_FOR_TREND` (3) days of real history — the same
+  constant name and value as the frontend engine, kept in sync by
+  convention since they're separate packages (backend Worker vs. frontend
+  bundle). The two extracted decision functions (`stalenessNote`,
+  `trendNote`) are covered by new `src/claude.test.ts`.
+- Frontend: Tree Detail now shows the latest `kind='sensor'` analysis in a
+  new "Sensei's daily reading" card (between the Soil metrics and
+  Baselines & thresholds sections), explicitly labeled as a supplementary
+  synthesis rather than the authoritative status — the status badge and
+  every alert stays driven by the deterministic engine, avoiding the
+  "two systems can disagree" bug class already fixed elsewhere this
+  session (`NextRiskPanel`/`CollectionStatusMatrix`/`TreeCard`/`Layout`/
+  `Environment`).
+- Debug endpoint: `GET /api/debug/diagnostic`, mirroring the existing
+  `/api/debug/rollup` pattern.
+- **Deliberately not done**: wiring diagnostic output into email/push
+  alerts. Weather and threshold alerts are deterministic; an LLM-generated
+  verdict triggering a real notification is a bigger trust decision than
+  just displaying it on Tree Detail, worth its own scoping once the
+  diagnostic has a track record.
+- Verified: backend typecheck clean, full test suite (63/63 across 10
+  files), full frontend production build clean. **Not verified**: an
+  actual live diagnostic run (needs a real `ANTHROPIC_API_KEY` call
+  through the deployed Worker, not exercised from this environment) —
+  recommend hitting `GET /api/debug/diagnostic` once deployed and
+  checking a tree's "Sensei's daily reading" card renders real output.
+
+**Also swept the rest of this file for claims contradicted by work done
+earlier the same day** (soil sensors going live, the frontend rewiring
+pass) that hadn't been corrected yet: Phase 1's checklist marked done with
+a summary line, the "known limitation" note under Trees/Timeline and the
+editable-profiles scope note both struck through with what actually
+changed, and Phase 3's comparative-insights item marked done (it shipped
+earlier as part of the Command+Spatial redesign, this file just hadn't
+caught up).
 
 ## Provisional substrate-aware soil moisture thresholds (2026-08-18)
 
@@ -421,11 +481,14 @@ tests for D1-touching code (`alerts.ts`'s D1 writes, route handlers) —
 those need `@cloudflare/vitest-pool-workers` wired to `wrangler.toml`,
 left as a follow-up if deeper coverage is wanted later.
 
-**Known limitation carried from the old Grove.tsx**: tree readings are
+~~**Known limitation carried from the old Grove.tsx**: tree readings are
 still `mockData.ts`'s deterministic demo data, labeled as such in the
 header ("Tree readings: demo data"). Live conditions (temp/AQI/forecast)
 now feed the condition strip and next-risk panel; per-tree sensor data
-still isn't wired to D1/real hardware (soil probes not installed yet).
+still isn't wired to D1/real hardware (soil probes not installed yet).~~
+**Resolved 2026-08-18** — soil probes installed, and per-tree data across
+every screen now reads real `soil_readings`/`daily_readings` via
+`useTreeInsights()`, see "Frontend rewired off mock soil data" above.
 
 - [x] Multi-layer weather map (2026-08-14) — `SpatialEvidencePanel`'s map
   now has 4 real, switchable layers (spec 7.3 naming): **Grove impact**
@@ -478,13 +541,19 @@ wrangler deploy` from the repo root.)
 `0011_app_settings.sql`) back real edit forms on Tree Detail and Settings.
 Scoped deliberately:
 
-- Grove/Trees list cards and demo sensor readings (soil moisture/EC/temp,
+- ~~Grove/Trees list cards and demo sensor readings (soil moisture/EC/temp,
   the insight engine) still come from the static `frontend/src/data/mockData.ts`
   seed, unchanged — editing a tree's thresholds on Tree Detail updates D1
   and the profile fields shown there, but doesn't yet feed back into
   `analyzeTree()`'s status logic on other screens. A full data-wiring pass
   (replacing the mock seed with live D1 reads everywhere) is a separate,
-  larger task.
+  larger task.~~ **Resolved 2026-08-18** — `useTreeInsights()` now merges
+  the live D1 profile's thresholds into `analyzeTreeReal()` for every
+  screen (`mergeTreeWithProfile()`), so an edited threshold does feed back
+  into status logic everywhere, not just the fields shown on Tree Detail
+  itself. Identity fields (name/species/origin notes/etc.) still come from
+  the static `Tree[]` array as a base, overridden by the live profile when
+  present — that part of the scoping still holds.
 - Tree Detail fetches the live D1 profile on mount and prefers it over the
   mock profile fields once loaded; falls back to the mock values if the
   fetch fails (e.g. local dev, where `api.grove-iq.com` is cross-origin and
@@ -515,12 +584,16 @@ Scoped deliberately:
       and fixed two real bugs: `pm25_ch1` vs `pm25_aqi`, rainfall unit ID)
 - [x] Turn on cron polling, confirm data flowing into D1 (5-min cron live,
       `conditions_readings` populating)
-- [ ] **WH52 soil sensors haven't arrived yet** — this is the blocker
-- [ ] Map soil channels to trees, seed real thresholds from live data
+- [x] WH51 soil sensors physically installed, one per tree (2026-08-18) —
+      see "Soil sensors installed, real data flowing" above
+- [x] Soil channels mapped to trees (`src/soilChannels.ts`, confirmed
+      against the real install by the user) and real thresholds seeded —
+      currently the provisional substrate-aware values from "Provisional
+      substrate-aware soil moisture thresholds" above, not a fully
+      calibrated per-sensor set (that's still open, see that section's
+      "Not done" list)
 
-Everything that doesn't depend on soil sensors specifically is done; per-tree
-data (soil moisture/EC/temp, and therefore real tree status) is still demo
-until the probes show up.
+**Phase 1 is done.**
 
 ## Phase 2 — AI layer (core daily-use loop)
 
@@ -545,11 +618,21 @@ until the probes show up.
 - [x] AirNow regional AQI (`src/airnow.ts`) — built and wired, but not yet
       activated: `AIRNOW_API_KEY` isn't configured, so it no-ops gracefully.
       Get a free key at docs.airnowapi.org to turn it on.
-- [ ] Daily per-tree diagnostic vs. species thresholds — deliberately not
-      built yet. Buildable today, but without real soil data it would only
-      ever diagnose fake per-tree readings against real (shared) weather —
-      confidently-wrong output, the same trust problem the earlier UI audit
-      flagged. Waiting on Phase 1's soil sensors to do this honestly.
+- [x] Daily per-tree AI diagnostic (2026-08-18) — `src/dailyDiagnostic.ts`'s
+      `runDailyDiagnostics()` runs once daily (13:00 UTC cron, after the
+      daily_readings rollup so it has fresh trend history), one Claude call
+      per tree via `src/claude.ts`'s `diagnoseTreeSensorData()`, writing a
+      `kind='sensor'` row into `analyses`. Carries the same honesty rules
+      as the rule-based engine it sits alongside: explicit that thresholds
+      are provisional/substrate-uncalibrated, explicit staleness warning if
+      the latest reading is over an hour old, and blocked from claiming a
+      trend below `MIN_DAYS_FOR_TREND` (3) days of real history — covered
+      by `src/claude.test.ts`. Deliberately additive, not a replacement:
+      the status badge and alerts everywhere else stay driven by the
+      deterministic `realTreeAnalysis.ts` engine; this is a supplementary
+      plain-language synthesis, surfaced on Tree Detail as "Sensei's daily
+      reading," explicitly labeled as not the authoritative status. Debug
+      endpoint: `GET /api/debug/diagnostic`.
 - [ ] Reolink E1 Outdoor Pro physical install + preset positions — camera
       ordered, not installed. Everything on the *code* side of this is now
       built (2026-08-14), waiting on the hardware:
@@ -614,9 +697,11 @@ until the probes show up.
       with no login; webhook reaches the Worker's own signature check
       instead of Access's login page)
 
-**Phase 2 has started** — manual photo vision analysis and current-condition
-alerts are live. Daily per-tree diagnostics and scheduled camera capture are
-still blocked on Phase 1 hardware.
+**Phase 2 is mostly done** — manual photo vision analysis, current-condition
+alerts, and the daily per-tree AI diagnostic are all live. What's left:
+scheduled (as opposed to on-demand) camera capture, still blocked on the
+physical camera install; and SMS delivery, blocked externally on Twilio's
+A2P 10DLC campaign review.
 
 ## Phase 3 — depth
 
@@ -632,8 +717,13 @@ still blocked on Phase 1 hardware.
       actual board, no valve/flow-sensor hardware wired up yet
 - [ ] Physical valve/drip install, local safety logic verified on real
       hardware — not done, needs the ESP32 physically wired up
-- [ ] Comparative insights, dormancy mode — not started (depends on
-      Phase 2's AI layer and real soil-sensor history)
+- [x] Comparative insights — `TreeCompare.tsx` (`/trees/compare/:idA/:idB`,
+      shipped as part of the Command+Spatial redesign's Phase 5) ships
+      side-by-side real analysis, an overlaid moisture chart, and shared
+      species context for same-species trees
+- [ ] Dormancy mode — not started; dormancy thresholds (`dormancy_soil_temp_c`)
+      exist per-tree and are surfaced on Tree Detail, but nothing yet
+      changes app behavior when a tree crosses into dormancy
 - [ ] Milestones, journal entries, training log — schema exists, no UI to
       create/edit any of these (Timeline only *displays* milestones already
       seeded in mock data)

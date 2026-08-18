@@ -35,6 +35,7 @@ export function TreeDetail() {
   const treeInsights = useTreeInsights();
 
   const [photoAnalyses, setPhotoAnalyses] = useState<PhotoAnalysis[]>([]);
+  const [sensorDiagnoses, setSensorDiagnoses] = useState<PhotoAnalysis[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,7 +58,9 @@ export function TreeDetail() {
     let cancelled = false;
     fetchTreeAnalyses(treeId)
       .then((analyses) => {
-        if (!cancelled) setPhotoAnalyses(analyses.filter((a) => a.kind === 'vision'));
+        if (cancelled) return;
+        setPhotoAnalyses(analyses.filter((a) => a.kind === 'vision'));
+        setSensorDiagnoses(analyses.filter((a) => a.kind === 'sensor'));
       })
       .catch(() => {
         // Imagery section falls back to placeholders below; not worth a
@@ -346,6 +349,24 @@ export function TreeDetail() {
           </Card>
         </div>
       </div>
+
+      {sensorDiagnoses[0] && (
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div className="eyebrow" style={{ marginBottom: 0 }}>
+              Sensei's daily reading
+            </div>
+            {sensorDiagnoses[0].status && <StatusBadge status={sensorDiagnoses[0].status} size="sm" />}
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)' }}>
+              {sensorDiagnoses[0].ts}
+            </span>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{sensorDiagnoses[0].detail}</p>
+          <p style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 8 }}>
+            AI synthesis of today's sensor readings — a plain-language second look, not the status badge above (that stays driven by the deterministic threshold check).
+          </p>
+        </Card>
+      )}
 
       <div>
         <div className="eyebrow" style={{ marginBottom: 10 }}>
