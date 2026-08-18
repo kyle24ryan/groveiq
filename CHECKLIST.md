@@ -4,7 +4,22 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-18 (WH51 soil sensors physically installed and writing real per-tree data — Phase 1's blocker is resolved).
+Last updated: 2026-08-18 (native Storms + Air & fire map content — steps 3-5 of the Mapbox brief).
+
+## Native Storms + Air & fire map content (2026-08-18)
+
+Steps 3-5 of the Mapbox implementation brief (see "Environmental context map refactor" below for steps 1-2 and full background), built by a background agent in an isolated worktree while soil sensor work (above) happened in parallel in the main worktree, then reviewed and merged in.
+
+- **Storms mode** (renamed from "Precipitation," which had no alerts before): native NWS active-alerts fetching (`src/routes/weatherAlerts.ts`, `src/nws.ts`'s `fetchActiveAlerts`) — polygons rendered on the map only when NWS actually provides geometry (most alerts are issued against county/zone codes with `geometry: null`; those render as a text row instead, never an invented shape). Radar gained real animation: play/pause, a frame-scrub slider, jump-to-latest, sourced from RainViewer's full frame history rather than just the latest — does not autoplay under `prefers-reduced-motion`.
+- **Air & fire mode** (renamed from "Local air," which had no fire/smoke content before):
+  - PurpleAir nearby-sensor markers (`src/purpleair.ts`, key server-side only). Raw PM2.5 converted to AQI via the public EPA 2024 breakpoint table — real math, not an invented value — but explicitly labeled "raw reading" everywhere it surfaces, since PurpleAir sensors are well known to read high relative to reference monitors and there's no verified site-specific correction factor for these particular ones. Indoor sensors (`location_type: 1`) are filtered out.
+  - NASA FIRMS active-fire detections (`src/firms.ts`, VIIRS, PNW bounding box, key server-side only). Distance/bearing from the grove computed via a proper haversine (`src/geo.ts`). Labeled "detected hotspot," never "fire perimeter" — a single ~375m satellite pixel reading hot isn't a fire boundary.
+  - NOAA HMS smoke plume polygons (`src/hmsSmoke.ts`) — pulled from NOAA's public ArcGIS FeatureServer rather than parsing their raw shapefiles by hand in a Worker (no filesystem, no native shapefile library available). Handles HMS's unusual `"YYYYDDD HHMM"` timestamp format. Labeled "observed plume," never "concentration forecast."
+- **Real bug fixed in `src/airnow.ts`**: the "is this forecast row for today" check compared AirNow's forecast-issuer local date against the Worker's UTC clock date — silently correct only at the one cron trigger time that happens to land on the same calendar date in both zones, silently wrong at any other time (a manual debug call, or the cron ever being rescheduled). Now compares grove-local (America/Los_Angeles) date, and the chosen forecast's actual date is now stored (`regional_air_quality.forecast_date`, migration `0014`) and shown in the UI, so a fallback pick is never silently presented as "today's" number.
+- Layer catalog updated: `MapLayerId` is now `'impact' | 'wind' | 'airFire' | 'storms'`. "Situation" (auto-selected default layer) and "Heat & sun" from the brief's proposed 4-mode restructure still have no defined content and were deliberately not added — same reasoning as steps 1-2's scoping.
+- `RegionalMaps.tsx` (Windy/PurpleAir iframes) is untouched. Native parity with steps 3-5 isn't the same as full regional-map parity (Windy's wind/precip layers, PurpleAir's broader regional crawl beyond "nearby") — removing it is still a separate call for whoever picks up step 6.
+- New tests: `src/firms.test.ts`, `src/geo.test.ts`, `src/hmsSmoke.test.ts`, `src/purpleair.test.ts`.
+- **Process note**: the agent's isolated worktree had a broken `node_modules` install (both root and `frontend/`, only a few KB instead of the expected hundreds of MB) for the duration of its run, which is almost certainly why it stopped mid-task waiting on a typecheck that could never actually complete rather than committing its work. Verified and fixed by reinstalling cleanly in the worktree before merging — all commits into `main` are typechecked (frontend `tsc -b` + backend `tsc --noEmit`) and tested (56/56) for real, not assumed from the agent's own unfinished verification.
 
 ## Soil sensors installed, real data flowing (2026-08-18)
 
