@@ -2,16 +2,29 @@ import type { Env } from './env';
 
 // GUARDRAIL — read before adding a daily/per-tree diagnostic function here:
 //
-// Do NOT send per-tree soil_readings (moisture/EC/temp) to the Anthropic
-// API, or write their output into `analyses` as if it were a real
-// diagnosis, until WH52 soil sensors are physically installed and
-// soil_readings actually contains live data for that tree. Every tree's
-// soil_readings is currently demo/mock data generated client-side
-// (frontend/src/data/mockData.ts) - it never reaches this Worker at all.
-// A "daily diagnostic" built against it would be Claude confidently
-// diagnosing a fake tree from fake numbers, indistinguishable in the UI
-// from a real diagnosis. That's the exact trust failure the Ecowitt UI
-// audit (2026-08) flagged and this codebase spent real effort fixing.
+// UPDATE 2026-08-18: WH51 soil sensors are now physically installed (5
+// channels, mapped to real trees in src/soilChannels.ts) and
+// src/ecowitt.ts's 5-min cron writes real per-tree soil_readings rows.
+// The original condition below is satisfied for the *backend* -- but
+// don't build the diagnostic function yet without also checking:
+// frontend/src/data/mockData.ts's dailyReadingsFor()/analyzeTree()/
+// insightFor() are still 100% synthetic and still drive every chart on
+// Trees/TreeDetail/Timeline/Grove. If a diagnostic function here reads
+// real soil_readings while the UI still renders mock data next to it,
+// that's a *worse* trust failure than the original one -- a real AI
+// verdict sitting beside a fake chart that visually contradicts it, with
+// no way for the user to tell which is which. Wire the frontend off
+// mock data (or at minimum onto GET /api/v1/trees/:id/soil-readings,
+// added 2026-08-18) in the same pass as building this, not after.
+//
+// Original guardrail, still the core rule: do NOT send per-tree
+// soil_readings (moisture/EC/temp) to the Anthropic API, or write output
+// into `analyses` as if it were a real diagnosis, for any tree whose
+// soil_readings is still synthetic. A "daily diagnostic" built against
+// fake numbers would be Claude confidently diagnosing a fake tree,
+// indistinguishable in the UI from a real diagnosis -- the exact trust
+// failure the Ecowitt UI audit (2026-08) flagged and this codebase spent
+// real effort fixing.
 //
 // analyzeTreePhoto() below is fine as-is: it sends a real uploaded photo,
 // not synthetic sensor readings, and the vision model itself can (and does)

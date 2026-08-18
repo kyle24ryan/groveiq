@@ -39,6 +39,22 @@ const EDITABLE_FIELDS = [
   'dormancy_soil_temp_c',
 ] as const;
 
+type SoilReadingRow = {
+  id: number;
+  tree_id: string;
+  ts: string;
+  soil_moisture_pct: number | null;
+  soil_temp_c: number | null;
+  soil_ec: number | null;
+};
+
+async function handleSoilReadings(env: Env, id: string, headers: HeadersInit, hours: number): Promise<Response> {
+  const { results } = await env.DB.prepare(`SELECT * FROM soil_readings WHERE tree_id = ? AND ts >= datetime('now', ?) ORDER BY ts ASC`)
+    .bind(id, `-${hours} hours`)
+    .all<SoilReadingRow>();
+  return Response.json({ readings: results }, { headers });
+}
+
 async function handleListTrees(env: Env, headers: HeadersInit): Promise<Response> {
   const { results } = await env.DB.prepare('SELECT * FROM trees ORDER BY name').all<TreeRow>();
   return Response.json({ trees: results }, { headers });
@@ -80,13 +96,19 @@ async function handlePatchTree(request: Request, env: Env, id: string, headers: 
 export async function handleTreesRoute(request: Request, env: Env, pathname: string): Promise<Response | null> {
   const listMatch = pathname === '/api/v1/trees';
   const singleMatch = pathname.match(/^\/api\/v1\/trees\/([^/]+)$/);
-  if (!listMatch && !singleMatch) return null;
+  const soilMatch = pathname.match(/^\/api\/v1\/trees\/([^/]+)\/soil-readings$/);
+  if (!listMatch && !singleMatch && !soilMatch) return null;
 
   const headers = corsHeaders(request);
   if (request.method === 'OPTIONS') return new Response(null, { headers });
 
   if (listMatch && request.method === 'GET') {
     return handleListTrees(env, headers);
+  }
+  if (soilMatch && request.method === 'GET') {
+    const url = new URL(request.url);
+    const hours = Number(url.searchParams.get('hours')) || 720; // 30 days default
+    return handleSoilReadings(env, soilMatch[1], headers, hours);
   }
   if (singleMatch && request.method === 'GET') {
     return handleGetTree(env, singleMatch[1], headers);

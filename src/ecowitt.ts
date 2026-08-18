@@ -8,6 +8,7 @@
 // than assuming.
 
 import type { Env } from './env';
+import { treeIdForSoilChannel } from './soilChannels';
 
 const ECOWITT_BASE_URL = 'https://api.ecowitt.net/api/v3/device/real_time';
 
@@ -41,6 +42,8 @@ export type EcowittBattery = {
 export type EcowittSoilChannel = {
   channel: number;
   soilMoisturePct: number | null;
+  soilTempC: number | null;
+  soilEc: number | null;
 };
 
 export type EcowittReading = {
@@ -132,13 +135,27 @@ export async function fetchEcowittRealTime(env: Env): Promise<EcowittReading | n
     bgtVoltageV: num(extractValue(batteryRaw.bgt_sensor)),
   };
 
+  // Verified against a real payload from 5 physical WH51 soil sensors on
+  // 2026-08-17 -- field is soil_moisture_ec_ch{n}, not soil_ch{n} as
+  // originally guessed before hardware existed to check against (that
+  // guess silently returned an empty soilChannels array forever, since
+  // the field never matched). Each channel also reports soil temp and EC,
+  // not just moisture -- matches soil_readings' three real columns.
   const soilChannels: EcowittSoilChannel[] = [];
   for (let ch = 1; ch <= 5; ch++) {
-    const node = data[`soil_ch${ch}`] as Record<string, unknown> | undefined;
+    const node = data[`soil_moisture_ec_ch${ch}`] as Record<string, unknown> | undefined;
     if (!node) continue;
+    // Ecowitt reports EC in µS/cm (confirmed by the raw payload's own
+    // "unit": "μS/cm" label) -- the app's soil_ec column, ec_threshold_high,
+    // and every existing EC display (Tree Detail's chart, mock data's
+    // generated range ~0.4-2.0) are all in mS/cm. Divide by 1000, or every
+    // real reading (e.g. 140 µS/cm) would land 1000x past the threshold.
+    const ecRawUScm = num(extractValue(node.ec));
     soilChannels.push({
       channel: ch,
       soilMoisturePct: num(extractValue(node.soilmoisture)),
+      soilTempC: num(extractValue(node.temperature)),
+      soilEc: ecRawUScm !== null ? ecRawUScm / 1000 : null,
     });
   }
 
@@ -181,4 +198,22 @@ export async function writeConditionsReading(env: Env, reading: EcowittReading):
       b.bgtVoltageV
     )
     .run();
+}
+
+// Writes one row per soil channel that has a confirmed tree mapping
+// (see soilChannels.ts). Channels without a confirmed mapping are
+// silently skipped rather than written under a guessed tree_id -- a
+// wrong per-tree mapping would be worse than no data at all, since it'd
+// silently mislabel one tree's readings as another's.
+export async function writeSoilReadings(env: Env, reading: EcowittReading): Promise<number> {
+  let written = 0;
+  for (const ch of reading.soilChannels) {
+    const treeId = treeIdForSoilChannel(ch.channel);
+    if (!treeId) continue;
+    await env.DB.prepare(`INSERT INTO soil_readings (tree_id, ts, soil_moisture_pct, soil_temp_c, soil_ec) VALUES (?, ?, ?, ?, ?)`)
+      .bind(treeId, reading.fetchedAt, ch.soilMoisturePct, ch.soilTempC, ch.soilEc)
+      .run();
+    written++;
+  }
+  return written;
 }

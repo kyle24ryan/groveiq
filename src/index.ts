@@ -10,7 +10,7 @@ import { handleTreesRoute } from './routes/trees';
 import { handleSettingsRoute } from './routes/settings';
 import { handlePushRoute } from './routes/push';
 import { handleCaptureRoute } from './routes/capture';
-import { fetchEcowittRealTime, writeConditionsReading } from './ecowitt';
+import { fetchEcowittRealTime, writeConditionsReading, writeSoilReadings } from './ecowitt';
 import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
 import { fetchNwsForecast, writeForecasts } from './nws';
 import { fetchAirNow, writeAirNowObservation } from './airnow';
@@ -139,9 +139,11 @@ export default {
     if (!reading) return; // credentials not configured
     await writeConditionsReading(env, reading);
     await evaluateConditionAlerts(env, reading.conditions);
-    // Soil channels intentionally unwritten — WH52 sensors haven't arrived
-    // yet, so reading.soilChannels is always empty right now. Wire up
-    // soil_readings writes once they're mapped to real trees.
+    // Soil sensors are physically installed and reporting (2026-08-18).
+    // writeSoilReadings() no-ops per-channel until soilChannels.ts's
+    // SOIL_CHANNEL_TREE_MAP is confirmed against the real install --
+    // currently all placeholders, so this is a no-op today, not dead code.
+    await writeSoilReadings(env, reading);
   },
 };
 

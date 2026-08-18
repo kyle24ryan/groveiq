@@ -4,7 +4,21 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-17 (Environmental context map: shell refactor + accessibility pass, phase 1-2 of the Mapbox implementation brief).
+Last updated: 2026-08-18 (WH51 soil sensors physically installed and writing real per-tree data — Phase 1's blocker is resolved).
+
+## Soil sensors installed, real data flowing (2026-08-18)
+
+**Phase 1's blocker is resolved**: 5 WH51 soil sensors are physically installed, one per tree, and confirmed reporting real data through Ecowitt. Two real bugs found and fixed while wiring this up (both previously invisible since there was no real hardware to check the guesses against):
+
+- **`src/ecowitt.ts` soil-channel parsing was looking for the wrong field.** It read `data.soil_ch{n}`, a guess made before any sensor existed to verify against; the real Ecowitt field is `soil_moisture_ec_ch{n}`. This meant `soilChannels` silently returned `[]` forever — not a crash, just quietly empty, which is exactly the kind of failure that's easy to miss. Fixed, and extended `EcowittSoilChannel` to capture `soilTempC`/`soilEc` (previously only `soilMoisturePct`), matching all three real columns `soil_readings` already had.
+- **EC unit mismatch.** Ecowitt reports EC in µS/cm (its own payload labels it `"unit": "μS/cm"`); every existing EC value in this codebase — `ec_threshold_high` (2.2-2.5), mock data's generated range (~0.4-2.0), Tree Detail's chart label — is mS/cm. Without converting, every real reading (e.g. 140 µS/cm) would've been written as "140 mS/cm," 1000x past any threshold. Now divided by 1000 in `ecowitt.ts`. Caught two already-written rows with the raw (wrong) value from the brief window between deploying the real channel mapping and finding this bug — corrected via a direct `UPDATE` rather than left in the table.
+- **`src/soilChannels.ts`** (new) maps each physical channel (1-5) to a `tree_id` — there's no way to derive this from the API, the gateway just reports "channel 3," not which pot it's in. Confirmed against the real install by the user: `1=mountain-hemlock, 2=dawn-redwood, 3=yellow-cedar-1, 4=yellow-cedar-2, 5=silver-fir`. `writeSoilReadings()` silently skips any channel without a confirmed mapping (fail-safe default was all-`REPLACE_ME` placeholders until the user gave the real assignment) — a wrong per-tree mapping would silently mislabel one tree's health data as another's, worse than no data.
+- Wired into the existing `*/5 * * * *` cron (`src/index.ts`) alongside the conditions poll — real `soil_readings` rows are now landing in D1 every 5 minutes.
+- New route `GET /api/v1/trees/:id/soil-readings?hours=N` (`src/routes/trees.ts`, defaults to 720h/30 days) — nothing consumes it yet.
+- Updated the AI-diagnostic guardrail comment in `src/claude.ts`: the original condition ("don't build a diagnostic until sensors are real") is now satisfied backend-side, but the comment now also flags that the **frontend still renders 100% synthetic data** (`frontend/src/data/mockData.ts`'s `dailyReadingsFor()`/`analyzeTree()`/`insightFor()` — Trees, Tree Detail, Timeline, Grove all still use these, untouched by this pass) — building a real diagnostic now, without also moving the UI off mock data, would put a real AI verdict next to a fake chart that visually contradicts it. Explicitly flagged as a bigger, separate lift, not done in this pass.
+- **Not yet examined closely, but real and worth a look**: initial readings show several trees well below their seeded moisture threshold (mountain-hemlock 19% vs. threshold-low 35%, dawn-redwood 11% vs. 32%, silver-fir 8% vs. 33%) — could be genuine dryness, could be sensor settling after fresh installation. Not enough data history yet to tell which.
+
+**Not done in this pass** (the natural next step, substantial enough to be its own piece of work): wiring Trees/TreeDetail/Timeline/Grove off `mockData.ts` and onto real `soil_readings` + the new route above; building the actual daily per-tree diagnostic function in `src/claude.ts` (guardrail is now clear to proceed, function itself doesn't exist); seeding real, researched thresholds in place of the current species-level rough guesses now that live data exists to sanity-check them against.
 
 ## Environmental context map refactor (2026-08-17)
 
