@@ -4,7 +4,45 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-17 (Mapbox GroveMap enhancements: dark mode, popup, particle wind animation).
+Last updated: 2026-08-17 (Environmental context map: shell refactor + accessibility pass, phase 1-2 of the Mapbox implementation brief).
+
+## Environmental context map refactor (2026-08-17)
+
+The user provided a detailed implementation brief ("GroveIQ-Mapbox-Implementation-Brief-for-Claude.md") reviewing the Mapbox integration and proposing a 9-step delivery sequence (native NWS alerts/radar animation, PurpleAir sensors, NOAA HMS smoke, NASA FIRMS fire detections, a Situation/Storms/Air&Fire/Heat&Sun mode restructure, then removing the Windy/PurpleAir iframes). Given the scope, only steps 1-2 were done in this pass; steps 3+ are tracked as separate follow-up tasks.
+
+**Also secured immediately on receipt**: the brief included a NASA FIRMS API key pasted in plaintext chat — stored as `NASA_FIRMS_MAP_KEY` Worker secret before anything else, never written to a file. Same posture as the PurpleAir key from earlier this session and the camera-key incident from 2026-08-15 — flagged to the user that pasted-in-chat keys should be rotated before production use.
+
+**Step 1 — shell refactor**: `frontend/src/components/spatial/GroveMap.tsx` and `SpatialEvidencePanel.tsx` (one file each owning map lifecycle, layer logic, and panel UI) replaced with `frontend/src/components/environment-map/`:
+- `EnvironmentalMap.tsx` — Mapbox lifecycle only (init, style/theme changes, cleanup).
+- `GroveMarker.ts` — accessible marker + popup construction.
+- `layerCatalog.ts` — layer IDs/labels.
+- `layers/radarLayer.ts`, `layers/localConditionsLayer.ts` — provider/domain logic (RainViewer fetch+status; wind particle math, AQI ring, color mapping), separated from React lifecycle so they're independently testable and swappable (e.g. RainViewer → NOAA MRMS later without touching the map shell).
+- `EnvironmentalContextPanel.tsx` — layout, layer buttons, evidence rows. Replaces `SpatialEvidencePanel` and is **purely environmental** — no per-tree insight/driver props. The old panel's "impact" layer showed tree-driver correlation text sourced from demo mock data next to real live-data rows; the brief's acceptance criteria explicitly calls this out ("never present a demo tree signal as though it were measured environmental correlation"), so that content was dropped rather than carried forward. Tree-specific priority framing stays in `PriorityIntelligencePanel`, unchanged.
+- The map now renders **permanently on Environment.tsx** (previously it only existed on Overview). The Windy/PurpleAir iframe section (`RegionalMaps.tsx`) is kept for now — brief step 6 explicitly sequences its removal *after* native Storms/Air&Fire reach parity, which hasn't happened yet.
+- On Overview (`Grove.tsx`), the compact map is now **decoupled from `needsAttention`** (demo tree status) and always renders; previously the entire map disappeared whenever all 5 trees were healthy. The tree-specific `PriorityIntelligencePanel` next to it stays conditional, since that one legitimately is about a specific tree.
+- Two of the brief's layer renames applied now (cost nothing, honest about current content): "Air & smoke" → "Local air", "Wind exposure" → "Wind at grove". The full Situation/Storms/Air&Fire/Heat&Sun mode restructure was **not** done — three of those four modes have zero real content until steps 3-5 ship (NWS alerts, PurpleAir, FIRMS/smoke don't exist yet), and Heat&Sun has no defined content anywhere in the brief. Shipping empty mode buttons now would be exactly the half-finished-scaffolding pattern this project avoids elsewhere.
+
+**Step 2 — accessibility/touch-target/ordering fixes** (folded into the same pass, same files):
+- `role="img"` on the map container (hides interactive descendants from assistive tech) → `role="region"`.
+- Grove marker is now a real `<button>` (keyboard-focusable, native Enter/Space activation) instead of a bare `<div>`.
+- Popup content built via `setDOMContent`/real DOM nodes instead of `setHTML(rawHtmlString)`.
+- Removed the broken `role="tab"` + `aria-selected` + `aria-pressed` combination (brief: implement full tab semantics with a tabpanel, or use ordinary pressed buttons — chose the latter, simpler and no tabpanel needed for 4 independent layer views). Now `role="group"` + plain buttons with `aria-pressed`.
+- Layer pills: `minHeight: 44` (was ~24px effective height) and `flexWrap: 'wrap'` — fixes the verified mobile defect where pills overflowed the card and the last one clipped instead of wrapping. Verified at 390px.
+- Evidence rows (`Row` component): `flexWrap` + `minWidth: 0` + `wordBreak: 'break-word'` on the value span — fixes the verified mobile defect where right-aligned values (e.g. long wind/AQI strings) were clipped and unreachable (page reported no horizontal overflow, so it was a flex-shrink issue, not a scroll issue).
+- Radar raster layer now inserted with `beforeId` (first symbol layer in the current style) instead of a bare `addLayer()`, which was stacking it above all labels — place/road names would've washed out under an opaque storm cell (only reproducible with rain in the area, not verified live for that specific case, but the ordering fix itself is unconditional).
+- Radar now reports explicit `loading`/`ready`/`empty`/`error` states (was: `useState` seeded at `Loading…` with no path to ever show anything else if the manifest came back empty, and errors only went to `console.error`).
+- "Local air" layer now shows separate freshness for the local sensor vs. the regional AirNow value (previously shared one `Freshness` row despite the two updating on completely different cadences — 5-min poll vs. daily).
+- `PURPLEAIR_API_KEY` and `NASA_FIRMS_MAP_KEY` added to `src/env.ts` (values already stored as Worker secrets; declaring them here doesn't wire any fetch logic yet, that's steps 4-5).
+
+**Verified**: typecheck (frontend `tsc -b` + backend `tsc --noEmit`) clean, full backend test suite (35 tests) still passing, browser-verified in local dev — layer switching, popup (DOM-based, no HTML injection), RainViewer maxzoom fix survived the refactor, accessibility tree confirms `region`/real `button` elements, 390px mobile pill-wrapping and evidence-row-wrapping both fixed, dark mode. **Not verified**: the authenticated production site (`grove-iq.com`, behind Cloudflare Access) — no browser session available for that login in this environment; local dev exercises the identical built code against demo/no-live-data fallback states instead of live provider data, which is a meaningfully different verification than what the brief asked for ("repeat the authenticated production check"). Recommend the user do a manual pass on the live site, light and dark mode, ideally during actual rain for the radar-under-labels ordering fix.
+
+**Deliberately not done in this pass** (tracked as follow-up tasks, matching the brief's own step numbering):
+- Step 3: native NWS alerts, animated radar with play/pause/timestamp slider.
+- Step 4: real PurpleAir nearby-sensor markers (key is stored and declared, no fetch/route/rendering yet), AirNow config/timestamp fix.
+- Step 5: NASA FIRMS fire detections, NOAA HMS smoke polygons.
+- Step 6: removing `RegionalMaps.tsx` (blocked on step 3-5 reaching parity, per the brief).
+- Step 7: Situation mode with auto-selected layer priority + evidence strip; the full 4-mode button restructure.
+- Steps 8-9: normalized historical snapshot table for real correlation claims; licensed gridded-weather provider evaluation. Both explicitly deferred in the brief itself, not just by this pass.
 
 ## Mapbox GroveMap enhancements (2026-08-17)
 

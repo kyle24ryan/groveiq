@@ -6,7 +6,7 @@ import { PriorityIntelligencePanel } from '../components/overview/PriorityIntell
 import { GroveConditionStrip } from '../components/overview/GroveConditionStrip';
 import { CollectionStatusMatrix } from '../components/overview/CollectionStatusMatrix';
 import { NextRiskPanel } from '../components/overview/NextRiskPanel';
-import { SpatialEvidencePanel } from '../components/spatial/SpatialEvidencePanel';
+import { EnvironmentalContextPanel } from '../components/environment-map/EnvironmentalContextPanel';
 
 export function Grove() {
   const { latest, regionalAqi, forecast, counts, needsAttention, priorityInsight, priorityTree, vpd, demand, freshness, sortedTrees } = useGroveOverview();
@@ -26,12 +26,23 @@ export function Grove() {
 
       <AlertBanner />
 
-      {needsAttention > 0 && priorityTree && (
-        <div className="rgrid-sidebar" style={{ gap: 16, alignItems: 'start' }}>
+      {/* Environmental context is decoupled from needsAttention (demo tree
+          status) -- it's always shown, since it's a real live-data map,
+          not a claim about a specific tree. The priority panel next to it
+          IS tree-specific and stays conditional. */}
+      <div className="rgrid-sidebar" style={{ gap: 16, alignItems: 'start' }}>
+        {needsAttention > 0 && priorityTree ? (
           <PriorityIntelligencePanel insight={priorityInsight} tree={priorityTree} sibling={sibling} />
-          <SpatialEvidencePanel insight={priorityInsight} tree={priorityTree} latest={latest} regionalAqi={regionalAqi} forecast={forecast} freshnessLabel={freshness.label} />
-        </div>
-      )}
+        ) : (
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>
+              Priority signal
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>All trees are stable right now.</p>
+          </div>
+        )}
+        <EnvironmentalContextPanel latest={latest} regionalAqi={regionalAqi} forecast={forecast} freshnessLabel={freshness.label} compact />
+      </div>
 
       <div>
         <div className="eyebrow" style={{ marginBottom: 10 }}>

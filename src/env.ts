@@ -8,6 +8,8 @@ export interface Env {
   ECOWITT_MAC?: string;
   ANTHROPIC_API_KEY?: string;
   AIRNOW_API_KEY?: string;
+  PURPLEAIR_API_KEY?: string;
+  NASA_FIRMS_MAP_KEY?: string;
   RESEND_API_KEY?: string;
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_API_KEY_SID?: string;

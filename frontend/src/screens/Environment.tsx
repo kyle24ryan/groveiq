@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { InfoTooltip } from '../components/InfoTooltip';
 import { AlertBanner } from '../components/AlertBanner';
 import { RegionalMaps } from '../components/RegionalMaps';
+import { EnvironmentalContextPanel } from '../components/environment-map/EnvironmentalContextPanel';
 import { Collapsible } from '../components/Collapsible';
 import { MiniTrendChart, ChartToggle, useChartToggle } from '../components/MiniTrendChart';
 import { metricInfo } from '../data/metricInfo';
@@ -361,6 +362,8 @@ export function Environment() {
               </div>
             )}
           </Card>
+
+          <EnvironmentalContextPanel latest={latest} regionalAqi={regionalAqi} forecast={forecast} freshnessLabel={freshness.label} />
 
           <div>
             <div className="eyebrow" style={{ marginBottom: 10 }}>
