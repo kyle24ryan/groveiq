@@ -169,6 +169,12 @@ export type RegionalAqi = {
   airnow_category: string | null;
   reporting_area: string | null;
   discussion: string | null;
+  // Calendar date (grove-local) the AQI value is actually valid for --
+  // separate from `ts` (when GroveIQ fetched it). AirNow's forecast
+  // endpoint can fall back to a non-"today" row right at a day boundary;
+  // this is what lets the UI say "forecast for {forecast_date}" instead of
+  // silently implying the number is for right now.
+  forecast_date: string | null;
 };
 
 export async function fetchRegionalAqi(): Promise<RegionalAqi | null> {
@@ -176,6 +182,91 @@ export async function fetchRegionalAqi(): Promise<RegionalAqi | null> {
   if (!res.ok) throw new Error(`regional-aqi failed: ${res.status}`);
   const body = (await res.json()) as { observation: RegionalAqi | null };
   return body.observation;
+}
+
+// --- NWS active weather alerts (Storms mode) ---
+
+export type NwsAlertGeometry = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown } | null;
+
+export type NwsAlert = {
+  id: string;
+  event: string;
+  severity: string;
+  certainty: string;
+  urgency: string;
+  headline: string | null;
+  areaDesc: string;
+  effective: string | null;
+  onset: string | null;
+  expires: string | null;
+  ends: string | null;
+  senderName: string;
+  webUrl: string;
+  geometry: NwsAlertGeometry;
+};
+
+export async function fetchActiveWeatherAlerts(): Promise<NwsAlert[]> {
+  const res = await apiFetch(`${API_BASE}/weather-alerts/active`);
+  if (!res.ok) throw new Error(`weather-alerts/active failed: ${res.status}`);
+  const body = (await res.json()) as { alerts: NwsAlert[] };
+  return body.alerts;
+}
+
+// --- PurpleAir nearby community sensors, NASA FIRMS fire detections, NOAA
+// HMS smoke plumes (Air & fire mode). All three return GeoJSON directly
+// from the Worker (already normalized server-side), so the frontend types
+// here just describe the `properties` bag each feature carries.
+
+export type PurpleAirSensorProperties = {
+  sensorIndex: number;
+  name: string;
+  pm25: number | null;
+  aqi: number | null;
+  aqiCategory: string | null;
+  lastSeenIso: string | null;
+  confidence: number | null;
+  source: string;
+};
+
+export async function fetchPurpleAirSensors(): Promise<GeoJSON.FeatureCollection<GeoJSON.Point, PurpleAirSensorProperties> | null> {
+  const res = await apiFetch(`${API_BASE}/purpleair/sensors`);
+  if (res.status === 501) return null; // PURPLEAIR_API_KEY not configured
+  if (!res.ok) throw new Error(`purpleair/sensors failed: ${res.status}`);
+  return (await res.json()) as GeoJSON.FeatureCollection<GeoJSON.Point, PurpleAirSensorProperties>;
+}
+
+export type FirmsDetectionProperties = {
+  acqDateIso: string;
+  satellite: string;
+  confidence: string;
+  frpMw: number | null;
+  daynight: 'Day' | 'Night' | null;
+  distanceKm: number;
+  bearingDeg: number;
+  bearingCompass: string;
+  source: string;
+};
+
+export async function fetchActiveFires(): Promise<GeoJSON.FeatureCollection<GeoJSON.Point, FirmsDetectionProperties> | null> {
+  const res = await apiFetch(`${API_BASE}/firms/active-fires`);
+  if (res.status === 501) return null; // NASA_FIRMS_MAP_KEY not configured
+  if (!res.ok) throw new Error(`firms/active-fires failed: ${res.status}`);
+  return (await res.json()) as GeoJSON.FeatureCollection<GeoJSON.Point, FirmsDetectionProperties>;
+}
+
+export type SmokePlumeProperties = {
+  satellite: string;
+  density: 'Light' | 'Medium' | 'Heavy' | 'Unknown';
+  startTimeIso: string | null;
+  endTimeIso: string | null;
+  distanceFromGroveKm: number | null;
+  source: string;
+};
+
+export async function fetchSmokePlumes(): Promise<GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, SmokePlumeProperties>> {
+  const res = await apiFetch(`${API_BASE}/smoke/plumes`);
+  if (!res.ok) throw new Error(`smoke/plumes failed: ${res.status}`);
+  return (await res.json()) as GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, SmokePlumeProperties>;
 }
 
 // Cron polls every 5 minutes; call it stale past 3x that so a couple of

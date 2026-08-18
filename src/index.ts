@@ -10,6 +10,10 @@ import { handleTreesRoute } from './routes/trees';
 import { handleSettingsRoute } from './routes/settings';
 import { handlePushRoute } from './routes/push';
 import { handleCaptureRoute } from './routes/capture';
+import { handleWeatherAlertsRoute } from './routes/weatherAlerts';
+import { handlePurpleAirRoute } from './routes/purpleair';
+import { handleFirmsRoute } from './routes/firms';
+import { handleSmokeRoute } from './routes/smoke';
 import { fetchEcowittRealTime, writeConditionsReading, writeSoilReadings } from './ecowitt';
 import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
 import { fetchNwsForecast, writeForecasts } from './nws';
@@ -66,6 +70,26 @@ export default {
 
     if (url.pathname === '/api/v1/forecast' || url.pathname === '/api/v1/sun' || url.pathname === '/api/v1/regional-aqi/latest') {
       const response = await handleForecastRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname === '/api/v1/weather-alerts/active') {
+      const response = await handleWeatherAlertsRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname === '/api/v1/purpleair/sensors') {
+      const response = await handlePurpleAirRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname === '/api/v1/firms/active-fires') {
+      const response = await handleFirmsRoute(request, env, url.pathname);
+      if (response) return response;
+    }
+
+    if (url.pathname === '/api/v1/smoke/plumes') {
+      const response = await handleSmokeRoute(request, env, url.pathname);
       if (response) return response;
     }
 

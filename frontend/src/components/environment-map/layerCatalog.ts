@@ -1,25 +1,22 @@
 // Layer IDs, labels, and ordering for the environmental context map.
 //
-// Scoped to layers that have real content today. The brief this panel was
-// rebuilt from ("GroveIQ-Mapbox-Implementation-Brief-for-Claude.md",
-// 2026-08-17) proposes a further restructure into four operational modes
-// (Situation / Storms / Air & fire / Heat & sun), but three of those modes
-// depend on data sources that don't exist yet (NWS alerts, PurpleAir
-// sensors, NOAA smoke, FIRMS fire, a Situation auto-selection algorithm).
-// Introducing empty mode buttons now would be exactly the kind of
-// half-finished scaffolding this project avoids elsewhere -- that
-// restructure happens once those data sources are wired in (see
-// CHECKLIST.md's Mapbox environmental-context section).
-//
-// Two renames from the brief ARE applied now, since they cost nothing and
-// are honest about current content: "Air & smoke" -> "Local air" (no
-// smoke rendered yet) and "Wind exposure" -> "Wind at grove" (a point
-// glyph, not a regional velocity field).
-export type MapLayerId = 'impact' | 'wind' | 'air' | 'precipitation';
+// The brief this panel was rebuilt from
+// ("GroveIQ-Mapbox-Implementation-Brief-for-Claude.md", 2026-08-17)
+// proposes a restructure into four operational modes (Situation / Storms /
+// Air & fire / Heat & sun). As of steps 3-5 (native NWS alerts + animated
+// radar, PurpleAir sensors, NASA FIRMS fire detections, NOAA HMS smoke),
+// two of those modes now have real content and are renamed accordingly:
+// "Precipitation" -> "Storms" (radar + active NWS alerts) and "Local air"
+// -> "Air & fire" (local AQI ring + PurpleAir community sensors + FIRMS
+// hotspots + HMS smoke plumes). "Situation" (auto-selected default layer)
+// and "Heat & sun" still have no defined/real content, so they are NOT
+// added as layer buttons here -- same half-finished-scaffolding concern as
+// before (see CHECKLIST.md's Mapbox environmental-context section).
+export type MapLayerId = 'impact' | 'wind' | 'airFire' | 'storms';
 
 export const LAYER_CATALOG: { id: MapLayerId; label: string }[] = [
   { id: 'impact', label: 'Grove impact' },
   { id: 'wind', label: 'Wind at grove' },
-  { id: 'air', label: 'Local air' },
-  { id: 'precipitation', label: 'Precipitation' },
+  { id: 'airFire', label: 'Air & fire' },
+  { id: 'storms', label: 'Storms' },
 ];
