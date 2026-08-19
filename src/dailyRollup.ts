@@ -38,6 +38,14 @@ export function yesterdayGroveLocalDateStr(now: Date = new Date()): string {
   return yesterday.toISOString().slice(0, 10);
 }
 
+// Today's date, grove-local. Used by the diagnostic dedup hash (input_hash
+// needs to change once per grove-local day, not once per UTC day) -- same
+// `Intl`-based America/Los_Angeles lookup as yesterdayGroveLocalDateStr,
+// just without stepping back a day.
+export function todayGroveLocalDateStr(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
 type SoilAgg = {
   tree_id: string;
   moisture_avg: number | null;

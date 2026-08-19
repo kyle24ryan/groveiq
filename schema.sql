@@ -66,7 +66,13 @@ CREATE TABLE IF NOT EXISTS conditions_readings (
 );
 CREATE INDEX IF NOT EXISTS idx_conditions_readings_ts ON conditions_readings(ts);
 
--- Daily rollup archive (indefinite retention; raw tables above trimmed to 90 days)
+-- Daily rollup archive (indefinite retention). Note: the raw tables above
+-- (soil_readings, conditions_readings) are also kept indefinitely -- no
+-- trim/cleanup job exists or is planned (2026-08-19: confirmed as an
+-- explicit user preference, "keep data as long as possible"). Anything
+-- that queries a bounded recent window (e.g. the daily diagnostic's
+-- RAW_SOIL_WINDOW_HOURS in src/dailyDiagnostic.ts) is a query-time choice
+-- for relevance/cost, not a reflection of what's actually retained.
 CREATE TABLE IF NOT EXISTS daily_readings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tree_id TEXT NOT NULL REFERENCES trees(id),
@@ -99,12 +105,27 @@ CREATE TABLE IF NOT EXISTS analyses (
   status TEXT CHECK (status IN ('ok','watch','urgent')),
   summary TEXT,
   detail TEXT,
-  model TEXT,                        -- e.g. 'claude-haiku-4-5', 'claude-sonnet-5'
+  model TEXT,                        -- e.g. 'claude-haiku-4-5', 'claude-sonnet-5' (requested model string)
   photo_r2_key TEXT,                 -- R2 object key, if vision-based
+  -- Audit/reproducibility fields (migration 0015). Nullable, no backfill --
+  -- populated going forward by the sensor diagnostic path; other `kind`s
+  -- may adopt them later.
+  provider TEXT,                     -- e.g. 'anthropic'
+  model_version TEXT,                -- resolved model string from the API response, distinct from `model` above
+  prompt_version TEXT,               -- hand-bumped tag for the prompt template used, e.g. 'sensor-v1'
+  input_hash TEXT,                   -- sha256(tree_id + grove-local date + evidence), truncated; dedup key
+  evidence_json TEXT,                -- exact deterministic evidence object shown to the model
+  output_json TEXT,                  -- raw parsed model response
+  confidence TEXT CHECK (confidence IN ('low','medium','high') OR confidence IS NULL),
+  data_start_ts TEXT,                -- bounds of the evidence window considered
+  data_end_ts TEXT,
   ts TEXT NOT NULL DEFAULT (datetime('now')),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_analyses_tree_ts ON analyses(tree_id, ts);
+-- NULL input_hash (every row except deduped 'sensor' diagnoses) is treated
+-- as distinct per SQLite's uniqueness rules, so this is a no-op elsewhere.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_analyses_tree_input_hash ON analyses(tree_id, input_hash);
 
 -- ============================================================
 -- MILESTONES (1.6)

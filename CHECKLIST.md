@@ -4,7 +4,117 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-18 (daily per-tree AI diagnostic built; checklist swept for stale claims).
+Last updated: 2026-08-18 (daily diagnostic hardened: evidence engine, dedup, anomaly-triggered cadence, audit schema).
+
+## Daily diagnostic hardening: evidence engine, dedup, cadence, audit schema (2026-08-18)
+
+Follow-up to "Daily per-tree AI diagnostic" below, same day. That version
+handed Claude a handful of near-raw numbers, re-diagnosed every tree every
+day regardless of state, and kept no record of what evidence a diagnosis
+was actually based on. Design doc: `.claude/design_001_harden-daily-diagnostic.md`.
+
+- `src/evidenceEngine.ts` (new) — `computeEvidence()`, a pure function
+  turning raw `soil_readings`/`daily_readings`/`conditions_readings` rows
+  into compact deterministic facts: reading age + sensor state
+  (reporting/stale/likely-offline), time above/below threshold in the last
+  24h, moisture change over 1h/6h/12h/24h, watering-event detection (≥5pt
+  rise within 30 min, annotated as possibly-rain when conditions support
+  it), post-watering dry-down slope, EC/temp anomaly flags, a 24h weather
+  rollup, a 14-day own-baseline comparison, a same-species companion-tree
+  comparison (the two Yellow Cedars today), and sensor reporting-gap
+  warnings. Also computes `mirroredStatus`: a backend-local port of the
+  frontend's real status logic (`frontend/src/data/realTreeAnalysis.ts`'s
+  `analyzeTreeReal`, same `MIN_DAYS_FOR_TREND`/`decliningFast`/
+  `daysToThreshold` formulas) included as a labeled fact for Claude to
+  react to — it does not overwrite `analyses.status`, which stays the
+  model's own field exactly as before. The two copies of this math are
+  kept in numeric lockstep by parity tests in `evidenceEngine.test.ts`,
+  not by a shared import (backend Worker vs. frontend bundle are still
+  separate packages — see `src/claude.ts`'s `MIN_DAYS_FOR_TREND` comment
+  for the existing convention this follows).
+- `migrations/0015_analyses_evidence_and_dedup.sql` + `schema.sql` —
+  `analyses` gains `provider`, `model_version`, `prompt_version`,
+  `input_hash`, `evidence_json`, `output_json`, `confidence`,
+  `data_start_ts`, `data_end_ts`, plus a `UNIQUE(tree_id, input_hash)`
+  index. All nullable, no backfill. Deliberately no `error_code` column —
+  `status` has a `CHECK` with no failure state, so failures stay in the
+  existing `errors: string[]` array instead, now with short prefixes
+  (`NO_API_KEY:`, `ANTHROPIC_HTTP_*:`, `PARSE_ERROR:`, `VALIDATION_ERROR:`)
+  from `src/claude.ts`.
+- Dedup: `input_hash = sha256(tree_id + grove-local date + the raw D1
+  snapshot the evidence was built from)`, truncated to 16 hex chars.
+  Deliberately hashes the *raw inputs*, not the computed `Evidence`
+  object — evidence embeds wall-clock-relative fields (reading age,
+  moisture-change windows, dry-down's hours-since-peak) that drift
+  continuously with `now`, which would make two calls a few minutes apart
+  over identical underlying data hash differently and defeat the entire
+  point. Verified live against a local dev D1: a cron retry / duplicate
+  `/api/debug/diagnostic` call over unchanged data now correctly counts as
+  `treesSkippedDuplicate`, not a second row.
+- Cadence: `shouldRunDiagnostic()` in `src/dailyDiagnostic.ts` (pure,
+  tested in `dailyDiagnostic.test.ts`) — diagnoses a tree every day its
+  mirrored status isn't `'ok'` (covers both a new and an ongoing anomaly),
+  otherwise only once every 7 days for a stable tree. Verified live: a
+  tree with a same-day `'ok'` diagnosis correctly shows up as
+  `treesSkippedStable`. True immediate-on-transition diagnosis (the moment
+  an anomaly first appears, not just "by the next 13:00 UTC cron")
+  deliberately deferred — needs a sub-daily trigger (the `*/5` Ecowitt-poll
+  handler is the natural hook, via `ctx.waitUntil` so a Claude-call hiccup
+  can't add risk to the sensor-ingestion path) and is the single riskiest
+  piece of this whole pass, better landed once the daily-cadence gate has
+  a track record.
+- `src/claude.ts`: `diagnoseTreeSensorData()` now takes the `Evidence`
+  object and embeds it as JSON in the prompt instead of manually-formatted
+  history lines — `evidence_json` persisted is therefore exactly what the
+  model saw. `Diagnosis` gains a `confidence: 'low'|'medium'|'high'`
+  field (also added to `analyzeTreePhoto`'s prompt/schema, since both
+  share the same type and parsing path); validation extracted into an
+  exported pure `isValidDiagnosisShape()` so it's unit-testable without
+  mocking `fetch`. `ClaudeCallResult` also carries `modelVersion` (the
+  API response's own resolved model string, for `model_version`).
+  Deliberately not adopting the richer `observations`/`hypotheses`/
+  `actions` output contract this pass — the diagnostic card only renders
+  `summary`+`detail` today, so the added parsing surface has no current
+  UI payoff.
+- Verified: backend typecheck clean, full test suite (85/85 across 12
+  files, up from 63/63). Live-verified twice: first against a local dev D1
+  (seeded soil history, real `wrangler dev --local`) with
+  `ANTHROPIC_API_KEY` overridden to empty to avoid a real paid call —
+  confirmed the query/evidence/cadence/dedup pipeline runs cleanly up to
+  the Claude call boundary. Then deployed to production (migration 0015
+  applied to remote D1, `wrangler deploy`) and hit `/api/debug/diagnostic`
+  for real against `grove-iq.com` (via the `.cf-access-service-token`
+  Access bypass) — **this is now a fully live-verified feature**, not just
+  code-reviewed:
+  - 3 of 5 trees diagnosed successfully with real Claude output. Quality
+    is genuinely strong — e.g. yellow-cedar-1's real diagnosis correctly
+    narrated two detected watering events (13%/7% rises), a 0.86%/hour
+    dry-down rate, a baseline comparison, and a companion-tree comparison
+    to yellow-cedar-2, all sourced from the evidence engine's output, not
+    invented. `provider`/`model_version`/`prompt_version`/`input_hash`/
+    `evidence_json`/`output_json`/`confidence` all populated correctly.
+  - **Real bug found and fixed**: 2 of 5 trees (mountain-hemlock,
+    dawn-redwood) failed — one on a visibly truncated JSON response, one
+    with an entirely empty text response — both consistent with the old
+    `max_tokens: 1024` being too tight for the richer evidence-based
+    prompt (successful `detail` fields ran 700-850 characters). Bumped to
+    2048 in `src/claude.ts` and improved the empty-response error message
+    to include `stop_reason` for future diagnosability. Not yet
+    re-verified live against the two trees that failed — no urgency,
+    since a failed diagnosis inserts no row, so the existing daily cron
+    picks both back up automatically tomorrow with no risk of a stale or
+    duplicate result.
+  - Also found and fixed **before** this deploy, not after: the remote D1
+    had never actually run `wrangler d1 migrations apply` — its
+    `d1_migrations` tracking table was empty even though migrations
+    0001-0013's effects were already live (bootstrapped via direct
+    `schema.sql` execution at some point) and migration 0014 had been
+    written and committed but never actually applied to production.
+    Backfilled `d1_migrations` records for 0001-0013 (verified against
+    live schema first, not assumed) and let `wrangler d1 migrations apply
+    --remote` run 0014 and 0015 for real. Worth knowing next time a
+    migration silently doesn't take: check `SELECT * FROM d1_migrations`
+    on remote before assuming `apply` will just work.
 
 ## Daily per-tree AI diagnostic (2026-08-18)
 
