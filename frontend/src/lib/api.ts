@@ -50,6 +50,24 @@ export async function fetchConditionsHistory(hours = 24): Promise<ConditionsRead
   return body.readings;
 }
 
+export type DailyConditionsRow = {
+  date: string;
+  outdoor_temp_avg: number | null;
+  outdoor_temp_min: number | null;
+  humidity_avg: number | null;
+  wind_max: number | null;
+  rain_total: number | null;
+  black_globe_max: number | null;
+  pm25_avg: number | null;
+};
+
+export async function fetchDailyConditionsHistory(days = 30): Promise<DailyConditionsRow[]> {
+  const res = await apiFetch(`${API_BASE}/conditions/daily-history?days=${days}`);
+  if (!res.ok) throw new Error(`conditions/daily-history failed: ${res.status}`);
+  const body = (await res.json()) as { readings: DailyConditionsRow[] };
+  return body.readings;
+}
+
 export type PhotoAnalysis = {
   id: number;
   kind: string;

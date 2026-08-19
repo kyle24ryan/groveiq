@@ -1,12 +1,17 @@
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
 import { MetricValue } from '../components/MetricValue';
+import { RangeSelector } from '../components/RangeSelector';
 import { speciesReference } from '../data/mockData';
+import type { TrendRange } from '../data/types';
 import { useTreeInsights } from '../hooks/useTreeInsights';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
+import { HOUR_RANGE_WINDOW_HOURS, daysForRange, formatXForRange, emptyMessageForRange } from '../lib/trendRange';
+import { fetchSoilReadings, fetchDailyReadings } from '../lib/api';
 
 // Real same-species comparison workflow (spec 6.2's "[Compare with Cedar
 // #1]" action) rather than the earlier stand-in that just linked to the
@@ -15,12 +20,50 @@ import { formatTemp, tempUnit } from '../lib/units';
 // species-mismatch guard is needed here. Analysis/readings come from the
 // same shared useTreeInsights() every other screen reads, so this can't
 // disagree with Trees/Tree Detail about either tree's current state.
+type CompareRow = { x: string; moisturePct: number | null };
+
 export function TreeCompare() {
   const { system } = useUnits();
   const { idA, idB } = useParams<{ idA: string; idB: string }>();
-  const { loading, trees, analyses, dailyReadingsByTree } = useTreeInsights();
+  const { loading, trees, analyses } = useTreeInsights();
   const treeA = trees.find((t) => t.id === idA);
   const treeB = trees.find((t) => t.id === idB);
+
+  const [chartRange, setChartRange] = useState<TrendRange>('week');
+  const [rowsA, setRowsA] = useState<CompareRow[]>([]);
+  const [rowsB, setRowsB] = useState<CompareRow[]>([]);
+
+  // Own dedicated fetch, independent of useTreeInsights' shared daily
+  // fetch, same reasoning as TreeDetail's chart section: this needs a
+  // range-driven window for two specific trees, not the fixed window every
+  // other screen's analysis engine needs.
+  useEffect(() => {
+    if (!idA || !idB) return;
+    let cancelled = false;
+    async function loadOne(treeId: string): Promise<CompareRow[]> {
+      if (chartRange === 'hour') {
+        const rows = await fetchSoilReadings(treeId, HOUR_RANGE_WINDOW_HOURS);
+        return rows.map((r) => ({ x: r.ts, moisturePct: r.soil_moisture_pct }));
+      }
+      const rows = await fetchDailyReadings(treeId, daysForRange(chartRange));
+      return rows.map((r) => ({ x: r.date, moisturePct: r.soil_moisture_avg }));
+    }
+    Promise.all([loadOne(idA), loadOne(idB)])
+      .then(([a, b]) => {
+        if (cancelled) return;
+        setRowsA(a);
+        setRowsB(b);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRowsA([]);
+          setRowsB([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [idA, idB, chartRange]);
 
   if (loading) {
     return <p style={{ fontSize: 13.5, color: 'var(--ink-soft)' }}>Loading…</p>;
@@ -40,9 +83,11 @@ export function TreeCompare() {
   if (!a || !b) {
     return <p style={{ fontSize: 13.5, color: 'var(--ink-soft)' }}>Loading…</p>;
   }
-  const readingsA = (dailyReadingsByTree[treeA.id] ?? []).slice(-14);
-  const readingsB = (dailyReadingsByTree[treeB.id] ?? []).slice(-14);
-  const merged = readingsA.map((r, i) => ({ date: r.date, [treeA.name]: r.soilMoistureAvg, [treeB.name]: readingsB[i]?.soilMoistureAvg }));
+  // Index-aligned merge assumes both trees rolled up on the same
+  // dates/cron ticks, true in practice since both come off the same
+  // shared cron -- a tree missing an isolated tick just leaves a gap
+  // (Recharts connectNulls handles it) rather than misaligning the rest.
+  const merged = rowsA.map((r, i) => ({ x: r.x, [treeA.name]: r.moisturePct, [treeB.name]: rowsB[i]?.moisturePct }));
   const species = speciesReference.find((s) => s.species === treeA.species);
 
   return (
@@ -95,31 +140,35 @@ export function TreeCompare() {
       </div>
 
       <Card>
-        <div className="eyebrow" style={{ marginBottom: 12 }}>
-          Soil moisture — last 14 days
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+          <div className="eyebrow">Soil moisture</div>
+          <RangeSelector value={chartRange} onChange={setChartRange} />
         </div>
-        {readingsA.length === 0 && readingsB.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-            Not enough daily history yet for a trend comparison — real soil sensors went live 2026-08-18, and daily rollups are written once a day.
-          </p>
-        ) : (
-          <>
-            <span className="sr-only">
-              {`${treeA.name} soil moisture ranged from ${Math.min(...readingsA.map((r) => r.soilMoistureAvg))}% to ${Math.max(...readingsA.map((r) => r.soilMoistureAvg))}% over the last 14 days, currently ${a.latest.soilMoistureAvg}%. ${treeB.name} ranged from ${Math.min(...readingsB.map((r) => r.soilMoistureAvg))}% to ${Math.max(...readingsB.map((r) => r.soilMoistureAvg))}%, currently ${b.latest.soilMoistureAvg}%.`}
-            </span>
-            <ResponsiveContainer width="100%" height={220} aria-hidden="true">
-              <LineChart data={merged}>
-                <CartesianGrid stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} tickFormatter={(d: string) => d.slice(5)} minTickGap={24} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} width={32} unit="%" />
-                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey={treeA.name} stroke="var(--insight)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey={treeB.name} stroke="var(--ok)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </>
-        )}
+        {(() => {
+          const valuesA = rowsA.map((r) => r.moisturePct).filter((v): v is number => v != null);
+          const valuesB = rowsB.map((r) => r.moisturePct).filter((v): v is number => v != null);
+          if (valuesA.length === 0 && valuesB.length === 0) {
+            return <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{emptyMessageForRange(chartRange)}</p>;
+          }
+          return (
+            <>
+              <span className="sr-only">
+                {`${treeA.name} soil moisture ranged from ${Math.min(...valuesA)}% to ${Math.max(...valuesA)}% over this range, currently ${a.latest.soilMoistureAvg}%. ${treeB.name} ranged from ${Math.min(...valuesB)}% to ${Math.max(...valuesB)}%, currently ${b.latest.soilMoistureAvg}%.`}
+              </span>
+              <ResponsiveContainer width="100%" height={220} aria-hidden="true">
+                <LineChart data={merged}>
+                  <CartesianGrid stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="x" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} tickFormatter={formatXForRange(chartRange)} minTickGap={24} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} width={32} unit="%" />
+                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Line type="monotone" dataKey={treeA.name} stroke="var(--insight)" strokeWidth={2} dot={false} connectNulls />
+                  <Line type="monotone" dataKey={treeB.name} stroke="var(--ok)" strokeWidth={2} dot={false} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </>
+          );
+        })()}
       </Card>
 
       {species && (

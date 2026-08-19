@@ -4,7 +4,64 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-18 (daily diagnostic hardened: evidence engine, dedup, anomaly-triggered cadence, audit schema).
+Last updated: 2026-08-19 (trend-graph range selector: hour/week/month/year across TreeDetail, TreeCompare, Environment).
+
+## Trend-graph range selector: hour/week/month/year (2026-08-19)
+
+Every "trend graph" surface previously showed one fixed window (soil
+charts: last 30 days from `daily_readings`; TreeCompare: last 14 days;
+Environment's conditions chart: last 24h from raw `conditions_readings`).
+Added a shared `Hour | Week | Month | Year` control and wired it into the
+three surfaces that are genuinely general trend browsers. Deliberately did
+**not** touch `MiniTrendChart` (the small inline 24h toggles tucked into
+individual Environment metric cards — too small for a 4-way selector, meant
+as a quick glance, not exploration) or `EvidenceProjectionChart` (a fixed
+observed+projected visualization tied to one detected anomaly, not a
+general browser) — both explicitly out of scope, matching the spirit of
+"where applicable."
+
+- `frontend/src/data/types.ts` — new `TrendRange = 'hour' | 'week' |
+  'month' | 'year'`.
+- `frontend/src/components/RangeSelector.tsx` (new) — the shared
+  segmented-button control.
+- `frontend/src/lib/trendRange.ts` (new, tested) — `daysForRange()`,
+  `formatXForRange()` (tick formatting per range), `emptyMessageForRange()`
+  (honest "not enough history yet" copy, not silent/blank), and
+  `HOUR_RANGE_WINDOW_HOURS`.
+- `frontend/src/components/ReadingChart.tsx` — generalized from a
+  `DailyReading[]`-specific chart to accept any `{ [xKey]: string,
+  [dataKey]: number }[]` (same pattern `MiniTrendChart` already used), plus
+  an empty-state message and a `headerRight` slot for the selector.
+- `frontend/src/screens/TreeDetail.tsx` — the three soil charts (moisture/
+  temp/EC) now share one `RangeSelector`. Owns its own dedicated fetch
+  (`fetchSoilReadings` for 'hour', `fetchDailyReadings` for the rest),
+  independent of `useTreeInsights`' shared 90-day daily fetch — picking
+  'year' here doesn't force every other screen (Trees, Grove, sidebar) to
+  pull a year of data they don't need just to compute a status badge.
+- `frontend/src/screens/TreeCompare.tsx` — same pattern, dedicated fetch
+  for both compared trees per range change.
+- `frontend/src/screens/Environment.tsx` — the big temp/humidity
+  `ComposedChart` gets its own range-driven fetch, separate from the fixed
+  24h `history` state that still feeds the five per-metric
+  `MiniTrendChart` toggles unchanged.
+- `src/routes/conditions.ts` (new endpoint) + `frontend/src/lib/api.ts` —
+  `GET /api/v1/conditions/daily-history?days=N`, querying `daily_readings`
+  (grouped `MAX()` across trees, since `dailyRollup.ts` writes the
+  identical location-wide conditions aggregate into every tree's row for a
+  given date) rather than raw `conditions_readings` — one row per day
+  instead of ~288, and no separate retention concern since `daily_readings`
+  is already kept indefinitely.
+- In passing: fixed a stale `schema.sql` comment claiming raw
+  `soil_readings`/`conditions_readings` are "trimmed to 90 days" — no such
+  job exists or is planned (confirmed as an explicit user preference,
+  "keep data as long as possible").
+- Verified: backend + frontend typecheck clean, full test suite (89/89
+  across 13 files), production build clean. Live-verified against
+  `grove-iq.com` post-deploy — the Hour range on Mountain Hemlock's soil
+  moisture chart correctly rendered a real watering-event spike from raw
+  5-minute sensor data; Month/Year ranges correctly show a single real
+  data point (2026-08-17, the only `daily_readings` day that exists yet)
+  rather than a fabricated trend line.
 
 ## Daily diagnostic hardening: evidence engine, dedup, cadence, audit schema (2026-08-18)
 

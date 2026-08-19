@@ -57,6 +57,46 @@ async function handleHistory(request: Request, env: Env, headers: HeadersInit): 
   return Response.json({ readings: results }, { headers });
 }
 
+type DailyConditionsRow = {
+  date: string;
+  outdoor_temp_avg: number | null;
+  outdoor_temp_min: number | null;
+  humidity_avg: number | null;
+  wind_max: number | null;
+  rain_total: number | null;
+  black_globe_max: number | null;
+  pm25_avg: number | null;
+};
+
+// Week/month/year chart ranges use the daily_readings rollup rather than
+// raw conditions_readings -- one row per day instead of ~288 (5-min
+// cadence), and it already exists with no separate retention concern.
+// daily_readings is keyed by tree_id but conditions are location-wide and
+// dailyRollup.ts writes the identical conditionsAgg into every tree's row
+// for a given date, so MAX() across trees is just a safe way to read "the"
+// value per date without depending on any particular tree_id existing.
+async function handleDailyHistory(request: Request, env: Env, headers: HeadersInit): Promise<Response> {
+  const url = new URL(request.url);
+  const days = Math.max(1, Number(url.searchParams.get('days')) || 30);
+  const { results } = await env.DB.prepare(
+    `SELECT date,
+            MAX(outdoor_temp_avg) as outdoor_temp_avg,
+            MAX(outdoor_temp_min) as outdoor_temp_min,
+            MAX(humidity_avg) as humidity_avg,
+            MAX(wind_max) as wind_max,
+            MAX(rain_total) as rain_total,
+            MAX(black_globe_max) as black_globe_max,
+            MAX(pm25_avg) as pm25_avg
+     FROM daily_readings
+     WHERE date >= date('now', ?)
+     GROUP BY date
+     ORDER BY date ASC`
+  )
+    .bind(`-${days} days`)
+    .all<DailyConditionsRow>();
+  return Response.json({ readings: results }, { headers });
+}
+
 export async function handleConditionsRoute(request: Request, env: Env, pathname: string): Promise<Response | null> {
   const headers = corsHeaders(request);
 
@@ -68,6 +108,9 @@ export async function handleConditionsRoute(request: Request, env: Env, pathname
   }
   if (pathname === '/api/v1/conditions/history' && request.method === 'GET') {
     return handleHistory(request, env, headers);
+  }
+  if (pathname === '/api/v1/conditions/daily-history' && request.method === 'GET') {
+    return handleDailyHistory(request, env, headers);
   }
   return null;
 }

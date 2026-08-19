@@ -4,15 +4,20 @@ import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
 import { MetricValue } from '../components/MetricValue';
 import { ReadingChart } from '../components/ReadingChart';
+import { RangeSelector } from '../components/RangeSelector';
 import { InsightPanel } from '../components/InsightPanel';
 import { InfoTooltip } from '../components/InfoTooltip';
 import { metricInfo } from '../data/metricInfo';
 import { trees, speciesReference, milestonesFor, lastWateredFor } from '../data/mockData';
+import type { TrendRange } from '../data/types';
 import { useTreeInsights } from '../hooks/useTreeInsights';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, formatTemp, tempUnit } from '../lib/units';
+import { HOUR_RANGE_WINDOW_HOURS, daysForRange, formatXForRange, emptyMessageForRange } from '../lib/trendRange';
 import {
   fetchTreeAnalyses,
+  fetchSoilReadings,
+  fetchDailyReadings,
   uploadTreePhoto,
   deleteTreeAnalysis,
   photoUrl,
@@ -52,6 +57,36 @@ export function TreeDetail() {
   const [draft, setDraft] = useState<TreeProfileEditableFields>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [chartRange, setChartRange] = useState<TrendRange>('month');
+  const [chartRows, setChartRows] = useState<{ x: string; soilMoistureAvg: number | null; soilTempC: number | null; soilEcAvg: number | null }[]>([]);
+
+  // Independent of useTreeInsights' shared 90-day daily fetch (which only
+  // needs ~14 days for the analysis engine's own trend calc) -- this chart
+  // section owns its own fetch so picking 'year' here doesn't force every
+  // other screen to pull a year of data it doesn't need.
+  useEffect(() => {
+    if (!treeId) return;
+    let cancelled = false;
+    const load =
+      chartRange === 'hour'
+        ? fetchSoilReadings(treeId, HOUR_RANGE_WINDOW_HOURS).then((rows) =>
+            rows.map((r) => ({ x: r.ts, soilMoistureAvg: r.soil_moisture_pct, soilTempC: r.soil_temp_c, soilEcAvg: r.soil_ec }))
+          )
+        : fetchDailyReadings(treeId, daysForRange(chartRange)).then((rows) =>
+            rows.map((r) => ({ x: r.date, soilMoistureAvg: r.soil_moisture_avg, soilTempC: r.soil_temp_avg, soilEcAvg: r.soil_ec_avg }))
+          );
+    load
+      .then((rows) => {
+        if (!cancelled) setChartRows(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setChartRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [treeId, chartRange]);
 
   useEffect(() => {
     if (!treeId) return;
@@ -229,7 +264,6 @@ export function TreeDetail() {
     ts: new Date().toISOString(),
   };
   const analysis = treeInsights.analyses[tree.id];
-  const readings = treeInsights.dailyReadingsByTree[tree.id] ?? [];
   const milestones = milestonesFor(tree.id);
   const latest = analysis?.latest ?? { date: '', soilMoistureAvg: 0, soilMoistureMin: 0, soilMoistureMax: 0, soilTempAvg: 0, soilEcAvg: 0 };
   const species = speciesReference.find((s) => s.species === tree.species);
@@ -253,7 +287,7 @@ export function TreeDetail() {
   const hasCurrentReading = analysis?.hasCurrentReading ?? false;
   const moistureInRange = hasCurrentReading && latest.soilMoistureAvg >= moistureLow && latest.soilMoistureAvg <= moistureHigh;
   const ecInRange = hasCurrentReading && latest.soilEcAvg <= ecThresholdHigh;
-  const readingsInDisplayUnits = readings.map((r) => ({ ...r, soilTempAvg: convertTemp(r.soilTempAvg, system) }));
+  const chartRowsInDisplayUnits = chartRows.map((r) => ({ ...r, soilTempC: r.soilTempC != null ? convertTemp(r.soilTempC, system) : null }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 960 }}>
@@ -580,10 +614,38 @@ export function TreeDetail() {
       </div>
 
       <div className="rgrid-2" style={{ gap: 16 }}>
-        <ReadingChart title="Soil moisture — last 30 days" data={readings} dataKey="soilMoistureAvg" color="var(--ok)" unit="%" />
-        <ReadingChart title="Soil temperature — last 30 days" data={readingsInDisplayUnits} dataKey="soilTempAvg" color="var(--insight)" unit={tempUnit(system)} />
+        <ReadingChart
+          title="Soil moisture"
+          data={chartRows}
+          dataKey="soilMoistureAvg"
+          xKey="x"
+          color="var(--ok)"
+          unit="%"
+          formatX={formatXForRange(chartRange)}
+          emptyMessage={emptyMessageForRange(chartRange)}
+          headerRight={<RangeSelector value={chartRange} onChange={setChartRange} />}
+        />
+        <ReadingChart
+          title="Soil temperature"
+          data={chartRowsInDisplayUnits}
+          dataKey="soilTempC"
+          xKey="x"
+          color="var(--insight)"
+          unit={tempUnit(system)}
+          formatX={formatXForRange(chartRange)}
+          emptyMessage={emptyMessageForRange(chartRange)}
+        />
       </div>
-      <ReadingChart title="Soil EC — last 30 days" data={readings} dataKey="soilEcAvg" color="var(--watch)" unit=" mS/cm" />
+      <ReadingChart
+        title="Soil EC"
+        data={chartRows}
+        dataKey="soilEcAvg"
+        xKey="x"
+        color="var(--watch)"
+        unit=" mS/cm"
+        formatX={formatXForRange(chartRange)}
+        emptyMessage={emptyMessageForRange(chartRange)}
+      />
 
       <div>
         <div className="eyebrow" style={{ marginBottom: 10 }}>

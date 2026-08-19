@@ -9,6 +9,7 @@ import { RegionalMaps } from '../components/RegionalMaps';
 import { EnvironmentalContextPanel } from '../components/environment-map/EnvironmentalContextPanel';
 import { Collapsible } from '../components/Collapsible';
 import { MiniTrendChart, ChartToggle, useChartToggle } from '../components/MiniTrendChart';
+import { RangeSelector } from '../components/RangeSelector';
 import { metricInfo } from '../data/metricInfo';
 import { aqiCategory } from '../lib/aqi';
 import { vpdKPa, waterDemandNow } from '../data/mockData';
@@ -16,6 +17,7 @@ import { useTreeInsights } from '../hooks/useTreeInsights';
 import {
   fetchLatestConditions,
   fetchConditionsHistory,
+  fetchDailyConditionsHistory,
   fetchForecast,
   fetchSunTimes,
   fetchRegionalAqi,
@@ -27,7 +29,8 @@ import {
 } from '../lib/api';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, tempUnit, formatTemp, convertWindSpeed, formatWindSpeed, windSpeedUnit, convertPressure, formatPressure, pressureUnit, formatRain, rainUnit } from '../lib/units';
-import type { Status } from '../data/types';
+import type { Status, TrendRange } from '../data/types';
+import { HOUR_RANGE_WINDOW_HOURS, daysForRange, formatXForRange, emptyMessageForRange } from '../lib/trendRange';
 
 const compassPoints = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 function compassLabel(deg: number): string {
@@ -57,6 +60,34 @@ export function Environment() {
   const [regionalAqi, setRegionalAqi] = useState<RegionalAqi | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [conditionsRange, setConditionsRange] = useState<TrendRange>('hour');
+  const [rangeRows, setRangeRows] = useState<{ x: string; temp: number | null; humidityPct: number | null }[]>([]);
+
+  // Independent of the 24h `history` fetch above (which stays fixed for the
+  // per-metric MiniTrendChart toggles) -- this drives only the big
+  // temp/humidity chart below, which owns its own range selector.
+  useEffect(() => {
+    let cancelled = false;
+    const load =
+      conditionsRange === 'hour'
+        ? fetchConditionsHistory(HOUR_RANGE_WINDOW_HOURS).then((rows) =>
+            rows.map((r) => ({ x: r.ts, temp: r.outdoor_temp_c != null ? convertTemp(r.outdoor_temp_c, system) : null, humidityPct: r.humidity_pct }))
+          )
+        : fetchDailyConditionsHistory(daysForRange(conditionsRange)).then((rows) =>
+            rows.map((r) => ({ x: r.date, temp: r.outdoor_temp_avg != null ? convertTemp(r.outdoor_temp_avg, system) : null, humidityPct: r.humidity_avg }))
+          );
+    load
+      .then((rows) => {
+        if (!cancelled) setRangeRows(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setRangeRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [conditionsRange, system]);
 
   useEffect(() => {
     let cancelled = false;
@@ -254,17 +285,16 @@ export function Environment() {
           </div>
 
           <Card>
-            <div className="eyebrow" style={{ marginBottom: 12 }}>
-              24-hour conditions
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+              <div className="eyebrow">Conditions</div>
+              <RangeSelector value={conditionsRange} onChange={setConditionsRange} />
             </div>
-            {chartData.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-                {loading ? 'Loading…' : 'Not enough history yet — the feed just went live.'}
-              </p>
+            {rangeRows.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{loading ? 'Loading…' : emptyMessageForRange(conditionsRange, 'the feed just went live')}</p>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={200}>
-                  <ComposedChart data={chartData}>
+                  <ComposedChart data={rangeRows}>
                     <defs>
                       <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="var(--watch)" stopOpacity={0.25} />
@@ -272,7 +302,7 @@ export function Environment() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid stroke="var(--border)" vertical={false} />
-                    <XAxis dataKey="hour" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} minTickGap={40} />
+                    <XAxis dataKey="x" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} tickFormatter={formatXForRange(conditionsRange)} minTickGap={40} />
                     <YAxis yAxisId="temp" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} width={32} />
                     <YAxis yAxisId="humidity" orientation="right" tick={{ fontSize: 11, fill: 'var(--ink-soft)' }} width={32} />
                     <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />

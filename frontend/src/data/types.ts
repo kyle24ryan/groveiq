@@ -1,5 +1,11 @@
 export type Status = 'ok' | 'watch' | 'urgent';
 
+// Shared range presets for trend-graph surfaces (TreeDetail's soil charts,
+// TreeCompare, Environment's conditions chart). 'hour' uses raw sensor
+// readings (5-min cadence); the rest use the daily_readings rollup at
+// progressively wider windows.
+export type TrendRange = 'hour' | 'week' | 'month' | 'year';
+
 export type DevelopmentStage = 'recovery' | 'development' | 'styling' | 'refinement';
 export type OriginType = 'yamadori' | 'nursery' | 'cutting' | 'other';
 
