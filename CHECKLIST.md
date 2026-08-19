@@ -285,11 +285,11 @@ Steps 3-5 of the Mapbox implementation brief (see "Environmental context map ref
 - **EC unit mismatch.** Ecowitt reports EC in µS/cm (its own payload labels it `"unit": "μS/cm"`); every existing EC value in this codebase — `ec_threshold_high` (2.2-2.5), mock data's generated range (~0.4-2.0), Tree Detail's chart label — is mS/cm. Without converting, every real reading (e.g. 140 µS/cm) would've been written as "140 mS/cm," 1000x past any threshold. Now divided by 1000 in `ecowitt.ts`. Caught two already-written rows with the raw (wrong) value from the brief window between deploying the real channel mapping and finding this bug — corrected via a direct `UPDATE` rather than left in the table.
 - **`src/soilChannels.ts`** (new) maps each physical channel (1-5) to a `tree_id` — there's no way to derive this from the API, the gateway just reports "channel 3," not which pot it's in. Confirmed against the real install by the user: `1=mountain-hemlock, 2=dawn-redwood, 3=yellow-cedar-1, 4=yellow-cedar-2, 5=silver-fir`. `writeSoilReadings()` silently skips any channel without a confirmed mapping (fail-safe default was all-`REPLACE_ME` placeholders until the user gave the real assignment) — a wrong per-tree mapping would silently mislabel one tree's health data as another's, worse than no data.
 - Wired into the existing `*/5 * * * *` cron (`src/index.ts`) alongside the conditions poll — real `soil_readings` rows are now landing in D1 every 5 minutes.
-- New route `GET /api/v1/trees/:id/soil-readings?hours=N` (`src/routes/trees.ts`, defaults to 720h/30 days) — nothing consumes it yet.
+- New route `GET /api/v1/trees/:id/soil-readings?hours=N` (`src/routes/trees.ts`, defaults to 720h/30 days) — ~~nothing consumes it yet~~ now used by `useTreeInsights` (current reading) and TreeDetail/TreeCompare's Hour-range chart fetch (see "Frontend rewired off mock soil data" and "Trend-graph range selector" above).
 - Updated the AI-diagnostic guardrail comment in `src/claude.ts`: the original condition ("don't build a diagnostic until sensors are real") is now satisfied backend-side, but the comment now also flags that the **frontend still renders 100% synthetic data** (`frontend/src/data/mockData.ts`'s `dailyReadingsFor()`/`analyzeTree()`/`insightFor()` — Trees, Tree Detail, Timeline, Grove all still use these, untouched by this pass) — building a real diagnostic now, without also moving the UI off mock data, would put a real AI verdict next to a fake chart that visually contradicts it. Explicitly flagged as a bigger, separate lift, not done in this pass.
 - ~~**Not yet examined closely, but real and worth a look**: initial readings show several trees well below their seeded moisture threshold (mountain-hemlock 19% vs. threshold-low 35%, dawn-redwood 11% vs. 32%, silver-fir 8% vs. 33%) — could be genuine dryness, could be sensor settling after fresh installation.~~ Examined — see "Provisional substrate-aware soil moisture thresholds" above: this was neither genuine dryness nor sensor settling, it was the thresholds themselves assuming conventional soil against a substrate-dependent sensor reading.
 
-**Not done in this pass** (the natural next step, substantial enough to be its own piece of work): ~~wiring Trees/TreeDetail/Timeline/Grove off `mockData.ts` and onto real `soil_readings` + the new route above~~ — done same day, see "Frontend rewired off mock soil data" above. Still not done: building the actual daily per-tree diagnostic function in `src/claude.ts` (guardrail is now clear to proceed, function itself doesn't exist); seeding real, researched thresholds in place of the current species-level rough guesses now that live data exists to sanity-check them against.
+~~**Not done in this pass** (the natural next step, substantial enough to be its own piece of work): wiring Trees/TreeDetail/Timeline/Grove off `mockData.ts` and onto real `soil_readings` + the new route above~~ — done same day, see "Frontend rewired off mock soil data" above. ~~Still not done: building the actual daily per-tree diagnostic function in `src/claude.ts`~~ — done same day, see "Daily per-tree AI diagnostic" and its later "hardening" follow-up above. ~~seeding real, researched thresholds in place of the current species-level rough guesses~~ — done, see "Provisional substrate-aware soil moisture thresholds" above.
 
 ## Environmental context map refactor (2026-08-17)
 
@@ -366,11 +366,12 @@ the app uses Mapbox) and shipped what was actually feasible for free:
   data available locally due to the documented cross-origin Access
   limitation).
 - **PurpleAir API key added** (`PURPLEAIR_API_KEY` Worker secret, read-key
-  only, `develop.purpleair.com`) — **not yet wired into any code.** Plan:
-  real nearby-sensor markers on the native map, replacing/supplementing
-  the "Air & smoke" ring, once actually implemented. Windy stays an
-  iframe regardless (`RegionalMaps.tsx`) — no free keyless alternative
-  exists for gridded wind model data.
+  only, `develop.purpleair.com`) — ~~not yet wired into any code~~ wired in
+  2026-08-18, see "Native Storms + Air & fire map content" above:
+  `src/purpleair.ts`/`src/routes/purpleair.ts` and the map's PurpleAir
+  layer render real nearby-sensor markers. Windy stays an iframe regardless
+  (`RegionalMaps.tsx`) — no free keyless alternative exists for gridded
+  wind model data.
 
 ## ESP32 camera-capture firmware + security incident (2026-08-14)
 
@@ -782,9 +783,9 @@ Scoped deliberately:
       only, no email/SMS delivery.
 - [x] Local sunrise/sunset/day-length calc (`src/suncalc.ts`), no API/key
       needed — supports Dawn Redwood's day-length dormancy trigger (1.4, 1a)
-- [x] AirNow regional AQI (`src/airnow.ts`) — built and wired, but not yet
-      activated: `AIRNOW_API_KEY` isn't configured, so it no-ops gracefully.
-      Get a free key at docs.airnowapi.org to turn it on.
+- [x] AirNow regional AQI (`src/airnow.ts`) — built and wired; `AIRNOW_API_KEY`
+      is configured on the live Worker (confirmed via `wrangler secret list`
+      2026-08-19), so this is active, not a no-op.
 - [x] Daily per-tree AI diagnostic (2026-08-18) — `src/dailyDiagnostic.ts`'s
       `runDailyDiagnostics()` runs once daily (13:00 UTC cron, after the
       daily_readings rollup so it has fresh trend history), one Claude call
