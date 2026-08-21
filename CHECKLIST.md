@@ -4,7 +4,117 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-19 (trend-graph range selector: hour/week/month/year across TreeDetail, TreeCompare, Environment).
+Last updated: 2026-08-21 (irrigation scaled from 1 to 5 zones: D1/Worker/UI/firmware).
+
+## Irrigation scaled from 1 to 5 zones (2026-08-21)
+
+Irrigation was single-zone-shaped end to end: `irrigation_zones.tree_id`
+was the primary key, the Worker's command poll never distinguished zones,
+firmware drove exactly one wired valve pair and ignored the `valve_channel`
+field the Worker already sent, and the frontend had zero real surface
+(`lastWateredFor()` was fabricated mock data running for all 5 trees;
+Settings just showed a static "hardware in hand" label). One controller,
+five zones (not five separate devices) — confirmed with the user before
+any code changed, since that assumption drove most of the design (no
+per-device auth/routing needed, just zone identity flowing through the
+existing single-poller model).
+
+Planned via `EnterPlanMode` after ~40 minutes of read-only research
+(3 parallel Explore agents covering current Worker/D1/frontend state,
+firmware/camera-auth patterns, and `capture_requests`/`alerts.ts`
+precedent) — plan saved to `.claude/plans/breezy-wandering-piglet.md`.
+
+- **D1** (`migrations/0016_irrigation_zone_identity_and_status.sql`) —
+  rebuilt `irrigation_zones` around a stable `zone_id` (SQLite can't ALTER
+  a PRIMARY KEY, so this is a full create/copy/drop/rename). Zones 2-5
+  deliberately **not seeded** with a tree mapping — which valve ends up
+  plumbed to which pot isn't known until physical install, same reasoning
+  `soilChannels.ts`'s real channel map waited for the soil sensors' actual
+  wiring. `irrigation_events` gains `zone_id`, `claimed_at`, and a real
+  `status` lifecycle (`pending → claimed → completed|aborted`) — the old
+  schema only had `flow_confirmed`/`aborted_reason` as an implicit,
+  non-atomic "is this resolved" signal.
+- **Worker** (`src/routes/irrigation.ts`) — `GET /command` claims
+  atomically (`UPDATE ... WHERE status='pending'`, checked via
+  `meta.changes`) instead of the old plain-SELECT poll, which never
+  actually closed the two-pollers-race-for-the-same-command problem.
+  Browser-facing watering moved off the previously-**unauthenticated**
+  `POST /api/v1/irrigation/water` onto `/api/v1/trees/:id/water-request`
+  (+ `/latest`), matching `capture-request`'s already-established pattern
+  so it picks up the same default Access session protection by construction.
+  New device-facing `POST /manual` for the physical button — locally
+  initiated (the button *is* local authority), reports after the fact
+  instead of pretending it went through the async queue it never used.
+- **Alerts** (`src/alerts.ts`) — `raiseIrrigationFaultAlert()` for
+  no-flow/max-runtime/configuration-fault aborts: a discrete, **self-resolving**
+  insert (not the weather-alert engine's persistent-until-cleared model —
+  these are past-tense events, the point is the notification, not a
+  lingering "active" banner). `sweepStaleIrrigationCommands()`, new on the
+  existing `*/5` cron: the case firmware itself can't report — a claimed
+  command whose duration+grace period elapsed with no `/confirm`, meaning
+  the valve *might still be open* and nobody would know. This one **does**
+  persist until the next sweep finds nothing stale, unlike the discrete
+  fault alerts.
+- **Firmware** (`firmware/irrigation/`) — `pins.h` restructured to the
+  scaling brief's per-zone array shape, explicit `PIN_TBD` placeholders for
+  zones 2-5 (zone 1 keeps its original never-bench-tested pins rather than
+  4 new invented-looking GPIO numbers). `main.cpp` zone-indexed throughout;
+  `kValvePulseMs` bumped 50ms → **100ms per bench work** (user-confirmed,
+  not a guess). Manual button now reads the rotary switch to pick a zone.
+  **Real bug found writing this**: camera_task.cpp and main.cpp share one
+  `secrets.h`; camera's `CF_ACCESS_CLIENT_ID`/`SECRET` macros would have
+  collided with an identically-named pair for irrigation — irrigation gets
+  its own `IRRIGATION_CF_ACCESS_CLIENT_ID`/`SECRET`. Untested against real
+  hardware (flagged in the file header, same convention as before) and not
+  compile-verified (no PlatformIO in this environment).
+- **Frontend** — "Water now" button on TreeDetail, mirroring "Capture
+  now"'s exact state/polling shape; real `last_watered_at` via a new
+  `formatRelativeTime()` (none existed reusable — the mock's day/hour math
+  was never factored out); a recent-watering-events list; irrigation
+  events bucketed into Timeline's existing `Milestone` marker system.
+  Zone/event data lives in `useTreeInsights`' shared fetch (new
+  `refetch()`), not screen-local — Timeline and TreeDetail must not
+  disagree about "when was this last watered."
+- **Verified end-to-end against real D1** (not just typecheck/tests) via
+  `wrangler dev --local`: water-request creation, dedup, 404 for a tree
+  with no zone, atomic claim, confirm, manual reporting, both alert paths
+  (self-resolving fault, persist-until-clear staleness), and the sweep's
+  resolve behavior on the next tick. **Found and fixed a real routing bug
+  this way**: `index.ts`'s dispatch guard only matched
+  `/api/v1/irrigation/*`, so the new `/api/v1/trees/*` routes never
+  reached the handler at all — every browser-facing call fell through to
+  the catch-all response. Neither typecheck nor unit tests would have
+  caught this; only hitting the actual route did.
+- **Also found and fixed along the way**: `frontend/node_modules` had
+  silently degraded to 10MB (should be ~194MB) between sessions, causing
+  `tsc -b` to hang indefinitely rather than fail — same failure mode as
+  the background agent's broken worktree install earlier this session.
+  Root-caused via `du -sh` again, fixed via `rm -rf node_modules && npm
+  install`.
+- **Production deploy**: migration 0016 applied via the Cloudflare
+  D1-query MCP tool, not the `wrangler` CLI — the CLI hung indefinitely on
+  `d1 execute --remote` under high local system load (13+ load average
+  from many concurrent background verification processes), and killing a
+  stuck process mid-migration is exactly the scenario that risks a broken
+  `DROP TABLE`/`RENAME` sequence. Verified via direct query that nothing
+  had partially applied before retrying through the MCP path, which
+  responded instantly. The MCP tool's own permission classifier blocked
+  the `DROP TABLE` step specifically (after allowing the `INSERT...SELECT`
+  data copy) — respected that rather than routing around it, and confirmed
+  with the user before proceeding, since the old table's data was by then
+  safely copied into `irrigation_zones_new` and nothing was at risk of
+  being lost either way. Worker and Pages both deployed and confirmed live
+  via direct D1 query; did not complete a live browser click-through since
+  the Access session had expired mid-task (routed to a real GitHub login
+  page) — did not attempt to sign in on the user's behalf.
+
+**What needs the user, not code** (see the plan file's "What needs you,
+not code" section for full detail): a Cloudflare Access Service Token +
+policy scoped to `/api/v1/irrigation/*` (same 3-step process as camera's,
+documented in `scripts/camera-capture/README.md` — confirmed via that doc
+this was never set up for irrigation); physical wiring confirmation before
+zones 2-5 get seeded; the firmware's own bench-test checklist (dry tests,
+per-zone bench tests, soak test) before trusting it near a real valve.
 
 ## Trend-graph range selector: hour/week/month/year (2026-08-19)
 
