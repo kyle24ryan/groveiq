@@ -183,6 +183,62 @@ export async function fetchLatestCaptureRequest(treeId: string): Promise<Capture
   return body.request;
 }
 
+// --- Irrigation watering-request queue (spec: "Water now" button) ---
+// Same shape as the capture-request queue above: the Worker can't reach
+// the ESP32 controller directly (no public IP on the home network), so
+// this just queues a request; the device polls for it on its own cycle.
+
+export type WaterRequest = {
+  id: string;
+  status: 'pending' | 'claimed' | 'completed' | 'aborted';
+  ts: string;
+  requested_duration_sec: number;
+  actual_duration_sec: number | null;
+  flow_confirmed: boolean | null;
+  aborted_reason: string | null;
+};
+
+export async function requestWatering(treeId: string, durationSec: number): Promise<{ requestId: string; alreadyPending: boolean }> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/water-request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ duration_sec: durationSec, trigger_source: 'manual' }),
+  });
+  const body = (await res.json()) as { ok: boolean; request_id?: string; already_pending?: boolean; error?: string };
+  if (!res.ok || !body.ok || !body.request_id) throw new Error(body.error || `water request failed: ${res.status}`);
+  return { requestId: body.request_id, alreadyPending: !!body.already_pending };
+}
+
+export async function fetchLatestWaterRequest(treeId: string): Promise<WaterRequest | null> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/water-request/latest`);
+  if (!res.ok) throw new Error(`water request status failed: ${res.status}`);
+  const body = (await res.json()) as { request: WaterRequest | null };
+  return body.request;
+}
+
+export type IrrigationZone = { zone_id: string; last_watered_at: string | null; last_duration_sec: number | null };
+export type IrrigationEvent = {
+  id: string;
+  ts: string;
+  status: 'pending' | 'claimed' | 'completed' | 'aborted';
+  trigger_source: 'manual' | 'scheduled' | 'sensor' | 'ai';
+  requested_duration_sec: number;
+  actual_duration_sec: number | null;
+  flow_confirmed: boolean | null;
+  aborted_reason: string | null;
+};
+
+// Zone config + recent watering history for a tree -- feeds useTreeInsights'
+// shared last-watered/event data (Timeline and TreeDetail must not
+// disagree about "when was this last watered", same reasoning as every
+// other shared fact in that hook). A tree with no irrigation zone yet
+// (4 of 5 trees today) returns { zone: null, events: [] }, not an error.
+export async function fetchIrrigationZone(treeId: string): Promise<{ zone: IrrigationZone | null; events: IrrigationEvent[] }> {
+  const res = await apiFetch(`${API_BASE}/trees/${treeId}/irrigation`);
+  if (!res.ok) throw new Error(`irrigation zone fetch failed: ${res.status}`);
+  return (await res.json()) as { zone: IrrigationZone | null; events: IrrigationEvent[] };
+}
+
 export type ActiveAlert = {
   id: number;
   alert_type: 'wind' | 'heat' | 'aqi' | string;

@@ -8,12 +8,13 @@ import { RangeSelector } from '../components/RangeSelector';
 import { InsightPanel } from '../components/InsightPanel';
 import { InfoTooltip } from '../components/InfoTooltip';
 import { metricInfo } from '../data/metricInfo';
-import { trees, speciesReference, milestonesFor, lastWateredFor } from '../data/mockData';
+import { trees, speciesReference, milestonesFor } from '../data/mockData';
 import type { TrendRange } from '../data/types';
 import { useTreeInsights } from '../hooks/useTreeInsights';
 import { useUnits } from '../contexts/UnitsContext';
 import { convertTemp, formatTemp, tempUnit } from '../lib/units';
 import { HOUR_RANGE_WINDOW_HOURS, daysForRange, formatXForRange, emptyMessageForRange } from '../lib/trendRange';
+import { formatRelativeTime } from '../lib/time';
 import {
   fetchTreeAnalyses,
   fetchSoilReadings,
@@ -25,6 +26,8 @@ import {
   updateTreeProfile,
   requestCapture,
   fetchLatestCaptureRequest,
+  requestWatering,
+  fetchLatestWaterRequest,
   type PhotoAnalysis,
   type TreeProfile,
   type TreeProfileEditableFields,
@@ -32,6 +35,9 @@ import {
 
 const CAPTURE_POLL_MS = 5000;
 const CAPTURE_TIMEOUT_MS = 3 * 60 * 1000; // camera + script + vision analysis shouldn't take longer than this
+const WATER_POLL_MS = 5000;
+const WATER_TIMEOUT_MS = 3 * 60 * 1000; // device polls on a ~15s cycle, same reasoning as capture's timeout
+const DEFAULT_WATER_DURATION_SEC = 30; // matches firmware's kDefaultManualDurationSec
 
 export function TreeDetail() {
   const { system } = useUnits();
@@ -51,6 +57,10 @@ export function TreeDetail() {
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'pending' | 'error'>('idle');
   const [captureError, setCaptureError] = useState<string | null>(null);
   const capturePollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [waterStatus, setWaterStatus] = useState<'idle' | 'pending' | 'error'>('idle');
+  const [waterError, setWaterError] = useState<string | null>(null);
+  const waterPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [profile, setProfile] = useState<TreeProfile | null>(null);
   const [editing, setEditing] = useState(false);
@@ -233,6 +243,58 @@ export function TreeDetail() {
     };
   }, []);
 
+  // Mirrors handleCaptureNow's shape exactly: queues a request the ESP32
+  // controller picks up on its own poll cycle (see
+  // firmware/irrigation/README.md), then polls the Worker back for that
+  // request's status until the device finishes it or the client gives up
+  // waiting.
+  async function handleWaterNow() {
+    if (!treeId) return;
+    setWaterStatus('pending');
+    setWaterError(null);
+    try {
+      await requestWatering(treeId, DEFAULT_WATER_DURATION_SEC);
+    } catch {
+      setWaterStatus('error');
+      setWaterError("Couldn't reach GroveIQ to request watering.");
+      return;
+    }
+
+    const deadline = Date.now() + WATER_TIMEOUT_MS;
+    const poll = async () => {
+      try {
+        const req = await fetchLatestWaterRequest(treeId);
+        if (req?.status === 'completed') {
+          setWaterStatus('idle');
+          treeInsights.refetch();
+          return;
+        }
+        if (req?.status === 'aborted') {
+          setWaterStatus('error');
+          setWaterError(req.aborted_reason ? `Watering aborted: ${req.aborted_reason.replace(/_/g, ' ')}.` : 'Watering aborted.');
+          treeInsights.refetch();
+          return;
+        }
+      } catch {
+        // Transient fetch failure -- keep polling until the deadline rather
+        // than giving up on one bad request.
+      }
+      if (Date.now() > deadline) {
+        setWaterStatus('error');
+        setWaterError('No response from the irrigation controller — is it running?');
+        return;
+      }
+      waterPollRef.current = setTimeout(poll, WATER_POLL_MS);
+    };
+    waterPollRef.current = setTimeout(poll, WATER_POLL_MS);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (waterPollRef.current) clearTimeout(waterPollRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (!lightboxPhoto) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -268,7 +330,9 @@ export function TreeDetail() {
   const latest = analysis?.latest ?? { date: '', soilMoistureAvg: 0, soilMoistureMin: 0, soilMoistureMax: 0, soilTempAvg: 0, soilEcAvg: 0 };
   const species = speciesReference.find((s) => s.species === tree.species);
   const sibling = trees.find((t) => t.species === tree.species && t.id !== tree.id);
-  const lastWatered = lastWateredFor(tree.id);
+  const irrigationZone = treeInsights.irrigationZoneByTree[tree.id];
+  const irrigationEvents = treeInsights.irrigationEventsByTree[tree.id] ?? [];
+  const lastWatered = irrigationZone?.last_watered_at ? formatRelativeTime(irrigationZone.last_watered_at) : irrigationZone === null ? 'Not installed' : '—';
 
   // Editable fields prefer the live D1 profile once it loads; fall back to
   // the static demo profile (used for sensor-reading generation regardless).
@@ -351,8 +415,26 @@ export function TreeDetail() {
       <InsightPanel insight={insight} />
 
       <div>
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          Soil
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="eyebrow">Soil</div>
+          <button
+            type="button"
+            onClick={handleWaterNow}
+            disabled={waterStatus === 'pending' || !irrigationZone}
+            title={irrigationZone ? 'Requests watering from the irrigation controller — needs the ESP32 controller running' : 'No irrigation zone configured for this tree yet'}
+            style={{
+              fontSize: 12.5,
+              padding: '5px 12px',
+              borderRadius: 999,
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              cursor: waterStatus === 'pending' || !irrigationZone ? 'default' : 'pointer',
+              opacity: waterStatus === 'pending' || !irrigationZone ? 0.6 : 1,
+            }}
+          >
+            {waterStatus === 'pending' ? 'Watering…' : 'Water now'}
+          </button>
         </div>
         <div className="rgrid-4" style={{ gap: 16 }}>
           <Card>
@@ -382,6 +464,29 @@ export function TreeDetail() {
             <MetricValue label="Last watered" value={lastWatered} tooltip={metricInfo.lastWatered} />
           </Card>
         </div>
+        {waterStatus === 'error' && waterError && <p style={{ fontSize: 12, color: 'var(--urgent)', marginTop: 10 }}>{waterError}</p>}
+        {irrigationEvents.length > 0 && (
+          <Card style={{ marginTop: 16 }}>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>
+              Recent watering
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {irrigationEvents.slice(0, 5).map((e) => (
+                <div key={e.id} style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+                  <div className="mono" style={{ fontSize: 12, color: 'var(--ink-soft)', width: 80, flexShrink: 0 }}>
+                    {e.ts.slice(0, 10)}
+                  </div>
+                  <div style={{ fontSize: 13.5 }}>
+                    {e.status === 'completed'
+                      ? `Watered for ${e.actual_duration_sec ?? e.requested_duration_sec}s${e.flow_confirmed ? '' : ' (flow unconfirmed)'}`
+                      : `Aborted — ${(e.aborted_reason ?? 'unknown reason').replace(/_/g, ' ')}`}
+                  </div>
+                  {e.trigger_source === 'ai' && <div style={{ fontSize: 11, color: 'var(--insight)' }}>AI-suggested</div>}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
 
       {sensorDiagnoses[0] && (

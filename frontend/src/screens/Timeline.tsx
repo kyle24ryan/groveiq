@@ -6,14 +6,36 @@ import { useTreeInsights } from '../hooks/useTreeInsights';
 import { useUnits } from '../contexts/UnitsContext';
 import { formatTemp, tempUnit } from '../lib/units';
 import { metricInfo } from '../data/metricInfo';
-import { fetchTreeAnalyses, photoUrl, type PhotoAnalysis } from '../lib/api';
-import type { Status } from '../data/types';
+import { fetchTreeAnalyses, photoUrl, type PhotoAnalysis, type IrrigationEvent } from '../lib/api';
+import type { Status, Milestone } from '../data/types';
 
 const rank: Record<Status, number> = { urgent: 0, watch: 1, ok: 2 };
 
+// Irrigation event ids come from a different D1 table/sequence than
+// milestones, so raw ids could collide as React keys once both are
+// rendered in the same marker list -- offset well clear of any real
+// milestone id rather than risk that.
+const IRRIGATION_MARKER_ID_OFFSET = 900_000_000;
+
+// scheduled/sensor trigger_source both map to the 'manual' visual
+// treatment -- the marker system only distinguishes manual vs AI, and
+// neither of those is AI-driven.
+function irrigationEventsToMilestones(treeId: string, events: IrrigationEvent[]): Milestone[] {
+  return events.map((e) => ({
+    id: IRRIGATION_MARKER_ID_OFFSET + Number(e.id),
+    treeId,
+    date: e.ts.slice(0, 10),
+    label:
+      e.status === 'completed'
+        ? `Watered for ${e.actual_duration_sec ?? e.requested_duration_sec}s${e.flow_confirmed ? '' : ' (flow unconfirmed)'}`
+        : `Watering aborted — ${(e.aborted_reason ?? 'unknown reason').replace(/_/g, ' ')}`,
+    source: e.trigger_source === 'ai' ? 'ai' : 'manual',
+  }));
+}
+
 export function Timeline() {
   const { system } = useUnits();
-  const { loading, trees, insightByTreeId, dailyReadingsByTree } = useTreeInsights();
+  const { loading, trees, insightByTreeId, dailyReadingsByTree, irrigationEventsByTree } = useTreeInsights();
   const [treeId, setTreeId] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [photoAnalyses, setPhotoAnalyses] = useState<PhotoAnalysis[]>([]);
@@ -51,7 +73,7 @@ export function Timeline() {
   const tree = treeId ? trees.find((t) => t.id === treeId) : undefined;
   const readings = treeId ? (dailyReadingsByTree[treeId] ?? []) : [];
   const reading = readings.length > 0 ? readings[Math.min(index, readings.length - 1)] : null;
-  const milestones = treeId ? milestonesFor(treeId) : [];
+  const milestones = treeId ? [...milestonesFor(treeId), ...irrigationEventsToMilestones(treeId, irrigationEventsByTree[treeId] ?? [])] : [];
 
   // Nearest real photo in time to the scrubbed date, matching this page's
   // own "imagery, readings, and events... synchronized" framing -- not
