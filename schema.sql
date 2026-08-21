@@ -254,26 +254,41 @@ CREATE INDEX IF NOT EXISTS idx_training_log_tree_date ON training_log(tree_id, d
 -- ============================================================
 -- SMART IRRIGATION MODULE (1.12)
 -- ============================================================
+-- zone_id (not tree_id) is the stable identity a Worker command routes on
+-- -- decoupled from GPIO/array position, same principle as
+-- src/soilChannels.ts's channel map. Migration 0016 rebuilt this table
+-- from an earlier tree_id-keyed version when irrigation scaled from 1 to
+-- 5 physical zones.
 CREATE TABLE IF NOT EXISTS irrigation_zones (
-  tree_id TEXT PRIMARY KEY REFERENCES trees(id),
-  valve_channel INTEGER NOT NULL,     -- 1-5, maps to rotary switch position
+  zone_id TEXT PRIMARY KEY,           -- e.g. 'zone-1'..'zone-5'
+  tree_id TEXT NOT NULL REFERENCES trees(id),
+  valve_channel INTEGER NOT NULL,     -- hardware-facing: pin-table index / rotary switch position
   mode TEXT NOT NULL DEFAULT 'manual' CHECK (mode IN ('manual','scheduled','sensor','ai')),
   last_watered_at TEXT,
   last_duration_sec INTEGER,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_irrigation_zones_tree ON irrigation_zones(tree_id);
 
 CREATE TABLE IF NOT EXISTS irrigation_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tree_id TEXT NOT NULL REFERENCES trees(id),
+  zone_id TEXT REFERENCES irrigation_zones(zone_id),
   ts TEXT NOT NULL DEFAULT (datetime('now')),
   trigger_source TEXT NOT NULL CHECK (trigger_source IN ('manual','scheduled','sensor','ai')),
   requested_duration_sec INTEGER NOT NULL,
   actual_duration_sec INTEGER,
   flow_confirmed INTEGER,             -- boolean 0/1, null if unknown
-  aborted_reason TEXT                 -- e.g. 'no_flow_detected', 'max_runtime_cutoff'
+  aborted_reason TEXT,                -- e.g. 'no_flow_detected', 'max_runtime_cutoff'
+  claimed_at TEXT,                    -- set when a device claims via GET /command; `ts` is creation time, can predate this
+  -- pending: created, not yet picked up. claimed: a device fetched it via
+  -- GET /command (atomic UPDATE...WHERE status='pending', checked via
+  -- meta.changes -- see migration 0016). completed/aborted: terminal,
+  -- set by POST /confirm.
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','claimed','completed','aborted'))
 );
 CREATE INDEX IF NOT EXISTS idx_irrigation_events_tree_ts ON irrigation_events(tree_id, ts);
+CREATE INDEX IF NOT EXISTS idx_irrigation_events_status ON irrigation_events(status, ts);
 
 -- capture_requests: command-queue for on-demand camera capture, mirroring
 -- irrigation_events -- the Worker can't reach the camera/local script
@@ -410,9 +425,13 @@ VALUES
   28, 88, 2.5, 7
 );
 
--- v1 single-zone irrigation hardware is assigned to Silver Fir ("Tipsoo")
-INSERT OR IGNORE INTO irrigation_zones (tree_id, valve_channel, mode)
-VALUES ('silver-fir', 1, 'manual');
+-- Only the one physically-wired zone is seeded. Zones 2-5 are deliberately
+-- NOT seeded with a tree mapping yet -- which valve ends up plumbed to
+-- which tree's pot isn't known until the irrigation lines are installed
+-- (same reasoning src/soilChannels.ts's real channel map waited for
+-- physical install). Add the other 4 rows once wiring is confirmed.
+INSERT OR IGNORE INTO irrigation_zones (zone_id, tree_id, valve_channel, mode)
+VALUES ('zone-1', 'silver-fir', 1, 'manual');
 
 -- Edge-triggered current-condition + forecast-based weather alerts
 -- (migrations 0006-0007)

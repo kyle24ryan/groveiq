@@ -15,7 +15,7 @@ import { handlePurpleAirRoute } from './routes/purpleair';
 import { handleFirmsRoute } from './routes/firms';
 import { handleSmokeRoute } from './routes/smoke';
 import { fetchEcowittRealTime, writeConditionsReading, writeSoilReadings } from './ecowitt';
-import { evaluateConditionAlerts, evaluateForecastAlerts } from './alerts';
+import { evaluateConditionAlerts, evaluateForecastAlerts, sweepStaleIrrigationCommands } from './alerts';
 import { fetchNwsForecast, writeForecasts } from './nws';
 import { fetchAirNow, writeAirNowObservation } from './airnow';
 import { rollUpDailyReadings, yesterdayGroveLocalDateStr } from './dailyRollup';
@@ -30,7 +30,7 @@ export default {
       return Response.json({ status: 'ok', trees: results[0]?.count ?? 0 });
     }
 
-    if (url.pathname.startsWith('/api/v1/irrigation/')) {
+    if (url.pathname.startsWith('/api/v1/irrigation/') || url.pathname.startsWith('/api/v1/trees/')) {
       const response = await handleIrrigationRoute(request, env, url.pathname);
       if (response) return response;
     }
@@ -165,6 +165,13 @@ export default {
       return Response.json(result);
     }
 
+    // TODO: temporary, for testing the irrigation staleness sweep
+    // on-demand instead of waiting for the */5 cron.
+    if (url.pathname === '/api/debug/irrigation-sweep') {
+      await sweepStaleIrrigationCommands(env);
+      return Response.json({ ok: true });
+    }
+
     return new Response('GroveIQ API — Phase 0 skeleton', {
       headers: { 'content-type': 'text/plain' },
     });
@@ -176,7 +183,12 @@ export default {
       return;
     }
 
-    // Default: the */5 * * * * Ecowitt poll.
+    // Default: the */5 * * * * poll. Irrigation's staleness sweep runs
+    // regardless of Ecowitt credential state -- it has nothing to do with
+    // the weather feed, and a stuck-open valve shouldn't go unnoticed just
+    // because Ecowitt is misconfigured.
+    await sweepStaleIrrigationCommands(env);
+
     const reading = await fetchEcowittRealTime(env);
     if (!reading) return; // credentials not configured
     await writeConditionsReading(env, reading);
