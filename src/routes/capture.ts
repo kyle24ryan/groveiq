@@ -1,6 +1,7 @@
 import type { Env } from '../env';
 import { corsHeaders } from './conditions';
 import { ingestTreePhoto, type PhotoSource } from './photos';
+import { isFeatureEnabled } from './settings';
 
 // Two auth models on purpose, matching irrigation.ts's split:
 // - Browser-facing endpoints (request a capture, check its status) stay
@@ -8,10 +9,11 @@ import { ingestTreePhoto, type PhotoSource } from './photos';
 //   protection every other browser-facing route already has -- no new
 //   bypass needed for these.
 // - Device-facing endpoints (poll for work, upload the result) live under
-//   /api/v1/capture/* and need their own Access "Bypass" policy (like
-//   /privacy, /terms, and the Twilio webhook already have), since the
-//   local capture script can't do interactive SSO. Auth for these is the
-//   X-Camera-Key header instead, checked in the Worker itself.
+//   /api/v1/capture/* and need their own Access Service Token policy (see
+//   scripts/camera-capture/README.md step 4), since the local capture
+//   script can't do interactive SSO. Auth for these is the X-Camera-Key
+//   header instead, checked in the Worker itself, as a second layer under
+//   the Access policy.
 function checkCameraAuth(request: Request, env: Env): boolean {
   const key = request.headers.get('X-Camera-Key');
   return !!key && !!env.CAMERA_DEVICE_KEY && key === env.CAMERA_DEVICE_KEY;
@@ -26,6 +28,15 @@ function unauthorized(headers?: HeadersInit): Response {
 async function handleGetCommand(request: Request, env: Env): Promise<Response> {
   if (!checkCameraAuth(request, env)) return unauthorized();
 
+  // Settings toggle: a disabled flow serves nothing new from the on-demand
+  // queue. Doesn't cover the scheduled daily auto-capture -- that path
+  // (both camera_task.cpp's checkForAutoCapture() and capture.mjs --auto)
+  // uploads directly via handleCaptureUpload below without ever polling
+  // this queue, so the toggle is enforced there instead.
+  if (!(await isFeatureEnabled(env, 'camera_enabled'))) {
+    return Response.json({ action: 'none' });
+  }
+
   const row = await env.DB.prepare(
     `SELECT id, tree_id, requested_at FROM capture_requests WHERE status = 'pending' ORDER BY requested_at ASC LIMIT 1`
   ).first<{ id: number; tree_id: string; requested_at: string }>();
@@ -37,6 +48,15 @@ async function handleGetCommand(request: Request, env: Env): Promise<Response> {
 
 async function handleCaptureUpload(request: Request, env: Env, treeId: string): Promise<Response> {
   if (!checkCameraAuth(request, env)) return unauthorized();
+
+  // The real chokepoint for the toggle: every upload path (on-demand
+  // queue, scheduled auto-capture, the Mac script) ends up here
+  // regardless of how it was triggered. Can't stop the physical camera
+  // from moving/snapping without the device itself checking in first, but
+  // this stops the result from being stored or analyzed.
+  if (!(await isFeatureEnabled(env, 'camera_enabled'))) {
+    return Response.json({ ok: false, error: 'camera_disabled' }, { status: 403 });
+  }
 
   const url = new URL(request.url);
   const sourceParam = url.searchParams.get('source');
@@ -79,6 +99,10 @@ async function handleReportFailure(request: Request, env: Env, requestId: number
 // --- Browser-facing: the app's "Capture now" button ---
 
 async function handleCreateRequest(env: Env, treeId: string, headers: HeadersInit): Promise<Response> {
+  if (!(await isFeatureEnabled(env, 'camera_enabled'))) {
+    return Response.json({ ok: false, error: 'camera_disabled' }, { status: 403, headers });
+  }
+
   const tree = await env.DB.prepare('SELECT id FROM trees WHERE id = ?').bind(treeId).first();
   if (!tree) return Response.json({ ok: false, error: `unknown tree_id ${treeId}` }, { status: 404, headers });
 

@@ -1,6 +1,7 @@
 import type { Env } from '../env';
 import { corsHeaders } from './conditions';
 import { raiseIrrigationFaultAlert } from '../alerts';
+import { isFeatureEnabled } from './settings';
 
 type TriggerSource = 'manual' | 'scheduled' | 'sensor' | 'ai';
 type AbortedReason = 'no_flow_detected' | 'max_runtime_cutoff' | 'wifi_lost' | 'manual_stop' | 'device_unresponsive' | 'configuration_fault' | null;
@@ -38,6 +39,15 @@ type CommandRow = {
 
 async function handleGetCommand(request: Request, env: Env): Promise<Response> {
   if (!checkDeviceAuth(request, env)) return unauthorized();
+
+  // Settings toggle: a disabled flow serves nothing new from the queue,
+  // even if a request slipped in before it was turned off. Doesn't touch
+  // /manual (the physical button is local authority, not gated by a
+  // remote app setting) or /confirm (an already-claimed command should
+  // always be allowed to report back, not get stranded mid-cycle).
+  if (!(await isFeatureEnabled(env, 'irrigation_enabled'))) {
+    return Response.json({ action: 'none' });
+  }
 
   const candidate = await env.DB.prepare(
     `SELECT ie.id, ie.tree_id, ie.zone_id, ie.requested_duration_sec, ie.ts, iz.valve_channel
@@ -204,6 +214,10 @@ async function handleManualReport(request: Request, env: Env): Promise<Response>
 // --- Browser-facing: the app's "Water now" button ---
 
 async function handleCreateWaterRequest(env: Env, treeId: string, headers: HeadersInit, request: Request): Promise<Response> {
+  if (!(await isFeatureEnabled(env, 'irrigation_enabled'))) {
+    return Response.json({ ok: false, error: 'irrigation_disabled' }, { status: 403, headers });
+  }
+
   const body = (await request.json().catch(() => ({}))) as { duration_sec?: number; trigger_source?: TriggerSource };
   const durationSec = body.duration_sec;
   if (!durationSec || !Number.isFinite(durationSec) || durationSec <= 0) {

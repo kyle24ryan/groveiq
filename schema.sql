@@ -547,7 +547,7 @@ CREATE TABLE IF NOT EXISTS sms_send_log (
 CREATE INDEX IF NOT EXISTS idx_sms_send_log_created ON sms_send_log(created_at);
 
 -- Simple key-value settings for the "Profile & grove" fields in Settings
--- (migration 0011).
+-- (migration 0011), plus feature toggles (migration 0017).
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL,
@@ -558,7 +558,9 @@ INSERT OR IGNORE INTO app_settings (key, value) VALUES
   ('collection_name', 'Grove Collection'),
   ('owner_name', 'Kyle Ryan'),
   ('location', 'North Bend, WA'),
-  ('hardiness_zone', 'USDA 8b');
+  ('hardiness_zone', 'USDA 8b'),
+  ('camera_enabled', 'true'),
+  ('irrigation_enabled', 'true');
 
 -- Web Push subscriptions (migration 0012). Single-user app behind
 -- Cloudflare Access, so no per-user linkage -- alerts fan out to every

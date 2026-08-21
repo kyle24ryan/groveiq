@@ -583,6 +583,10 @@ export type AppSettings = {
   owner_name?: string;
   location?: string;
   hardiness_zone?: string;
+  // Stored as the string 'true'/'false' (app_settings is a generic
+  // key-value TEXT store), not a real boolean -- compare against 'true'.
+  camera_enabled?: string;
+  irrigation_enabled?: string;
 };
 
 export async function fetchAppSettings(): Promise<AppSettings> {

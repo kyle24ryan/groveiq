@@ -202,9 +202,9 @@ export function TreeDetail() {
     setCaptureError(null);
     try {
       await requestCapture(treeId);
-    } catch {
+    } catch (err) {
       setCaptureStatus('error');
-      setCaptureError("Couldn't reach GroveIQ to request a capture.");
+      setCaptureError(err instanceof Error && err.message === 'camera_disabled' ? 'Camera is turned off in Settings.' : "Couldn't reach GroveIQ to request a capture.");
       return;
     }
 
@@ -254,9 +254,9 @@ export function TreeDetail() {
     setWaterError(null);
     try {
       await requestWatering(treeId, DEFAULT_WATER_DURATION_SEC);
-    } catch {
+    } catch (err) {
       setWaterStatus('error');
-      setWaterError("Couldn't reach GroveIQ to request watering.");
+      setWaterError(err instanceof Error && err.message === 'irrigation_disabled' ? 'Irrigation is turned off in Settings.' : "Couldn't reach GroveIQ to request watering.");
       return;
     }
 

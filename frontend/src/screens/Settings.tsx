@@ -113,8 +113,8 @@ export function Settings() {
             </div>
           )}
           <DeviceRow name="Soil moisture probes (5)" status="Installed and reporting, live since 2026-08-17" />
-          <DeviceRow name="Camera" status="Ordered, not yet installed" />
-          <DeviceRow name="Irrigation controller" status="Hardware in hand, firmware scaffolded and untested" />
+          <FeatureToggleRow settingKey="camera_enabled" name="Camera" status="Ordered, not yet installed" />
+          <FeatureToggleRow settingKey="irrigation_enabled" name="Irrigation controller" status="Hardware in hand, firmware scaffolded and untested" />
         </div>
       </Card>
 
@@ -388,6 +388,90 @@ function DeviceSubRow({ name, status, tone }: { name: string; status: string; to
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--ink-faint)' }}>
       <span>{name}</span>
       <span className={tone ? `status-${tone}` : undefined}>{status}</span>
+    </div>
+  );
+}
+
+// Kill switch for the camera/irrigation app+device flows: stops the
+// "Capture now"/"Water now" buttons, the on-demand device poll queue, and
+// (for camera) every upload path including the scheduled daily
+// auto-capture, since that bypasses the queue and uploads directly --
+// enforced Worker-side in handleCaptureUpload, not just hidden here.
+// Does NOT reach the irrigation controller's physical manual button --
+// that's local authority by design, independent of a remote app setting.
+// Self-contained fetch, matching ProfileCard's own independent-fetch
+// pattern below rather than a shared hook, since this is two rows with no
+// data other screens need to agree on.
+function FeatureToggleRow({ settingKey, name, status }: { settingKey: 'camera_enabled' | 'irrigation_enabled'; name: string; status: string }) {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppSettings()
+      .then((s) => {
+        if (!cancelled) setEnabled((s[settingKey] ?? 'true') === 'true');
+      })
+      .catch(() => {
+        if (!cancelled) setEnabled(true); // fail open, matches the Worker's own default
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [settingKey]);
+
+  async function toggle() {
+    if (enabled === null || busy) return;
+    const next = !enabled;
+    setBusy(true);
+    try {
+      await updateAppSettings({ [settingKey]: next ? 'true' : 'false' });
+      setEnabled(next);
+    } catch {
+      // Leave the toggle at its last known-good state on failure.
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      <div>
+        <div style={{ fontSize: 13.5 }}>{name}</div>
+        <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{status}</div>
+      </div>
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={enabled === null || busy}
+        aria-pressed={enabled ?? false}
+        aria-label={`${enabled ? 'Disable' : 'Enable'} ${name.toLowerCase()}`}
+        title={enabled ? 'Enabled -- click to disable' : 'Disabled -- click to enable'}
+        style={{
+          width: 40,
+          height: 22,
+          borderRadius: 999,
+          border: '1px solid var(--border)',
+          background: enabled ? 'var(--ok)' : 'var(--canvas)',
+          position: 'relative',
+          flexShrink: 0,
+          cursor: enabled === null || busy ? 'default' : 'pointer',
+          opacity: enabled === null || busy ? 0.6 : 1,
+        }}
+      >
+        <span
+          style={{
+            position: 'absolute',
+            top: 2,
+            left: enabled ? 20 : 2,
+            width: 16,
+            height: 16,
+            borderRadius: '50%',
+            background: 'var(--surface)',
+            transition: 'left 0.15s ease',
+          }}
+        />
+      </button>
     </div>
   );
 }

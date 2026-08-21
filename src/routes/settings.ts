@@ -1,8 +1,20 @@
 import type { Env } from '../env';
 import { corsHeaders } from './conditions';
 
-const KEYS = ['collection_name', 'owner_name', 'location', 'hardiness_zone'] as const;
+const KEYS = ['collection_name', 'owner_name', 'location', 'hardiness_zone', 'camera_enabled', 'irrigation_enabled'] as const;
 type SettingsKey = (typeof KEYS)[number];
+
+// Shared by capture.ts and irrigation.ts to gate their browser-facing
+// create endpoints and device-facing poll queues on the Settings toggles.
+// Fails open (enabled) if the row is missing -- these keys are always
+// seeded by migration 0017, so a missing row means the migration hasn't
+// run yet, not that someone deliberately disabled the feature; failing
+// closed in that case would silently break capture/irrigation on any
+// environment that hasn't caught up, which is worse than the reverse.
+export async function isFeatureEnabled(env: Env, key: 'camera_enabled' | 'irrigation_enabled'): Promise<boolean> {
+  const row = await env.DB.prepare('SELECT value FROM app_settings WHERE key = ?').bind(key).first<{ value: string }>();
+  return row ? row.value === 'true' : true;
+}
 
 async function handleGet(env: Env, headers: HeadersInit): Promise<Response> {
   const { results } = await env.DB.prepare('SELECT key, value FROM app_settings').all<{ key: string; value: string }>();
