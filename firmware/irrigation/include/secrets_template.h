@@ -12,6 +12,21 @@
 
 #define API_BASE_URL "https://api.grove-iq.com/api/v1/irrigation"
 
+// Cloudflare Access Service Token (Zero Trust -> Access -> Service Auth ->
+// Service Tokens), scoped to an Access policy covering
+// api.grove-iq.com/api/v1/irrigation/* -- same 3-step process as
+// scripts/camera-capture/README.md step 4 describes for the camera path,
+// just pointed at /api/v1/irrigation/* instead. This project has never
+// actually set this up for irrigation (confirmed via that same README) --
+// do it before flashing, or /command and /confirm will be blocked at
+// Cloudflare's edge before DEVICE_KEY is ever checked. Named distinctly
+// from camera_task.cpp's CF_ACCESS_CLIENT_ID/SECRET since both files
+// share this one secrets.h and the two services' policies (and possibly
+// tokens) are separately scoped -- can point at the same token value if
+// you choose to reuse one, or a different one.
+#define IRRIGATION_CF_ACCESS_CLIENT_ID "REPLACE_ME"
+#define IRRIGATION_CF_ACCESS_CLIENT_SECRET "REPLACE_ME"
+
 // --- Camera capture (runs as a separate FreeRTOS task on core 0 -- see
 // camera_task.cpp -- isolated from the irrigation safety loop above,
 // which stays on core 1) ---
