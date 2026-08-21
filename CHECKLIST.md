@@ -4,7 +4,23 @@ Tracks progress against `SPEC.md`'s phasing (section 6). Update this
 alongside real changes — it's a snapshot, not a source of truth; the code
 and `SPEC.md` are authoritative when they disagree with this file.
 
-Last updated: 2026-08-21 (irrigation scaled from 1 to 5 zones: D1/Worker/UI/firmware).
+Last updated: 2026-08-21 (Settings toggles to disable camera/irrigation flows).
+
+## Settings toggles for camera/irrigation flows (2026-08-21)
+
+Two new `app_settings` keys (migration 0017, defaulted `'true'`), enforced
+at the real chokepoints, not just hidden in the UI: browser-facing create
+endpoints, device-facing poll queues, and — for camera specifically —
+`handleCaptureUpload`, since the scheduled daily auto-capture
+(`camera_task.cpp`'s `checkForAutoCapture()` and `capture.mjs --auto`)
+bypasses the queue entirely and uploads directly; a toggle that only
+gated the queue would have missed it (found while wiring this up).
+Deliberately doesn't reach the irrigation controller's physical manual
+button — that's local authority by design. `Settings.tsx` gets a small
+self-contained `FeatureToggleRow` on the existing Camera/Irrigation
+device rows. Verified end-to-end against local D1: disabling blocks both
+the browser request and the device poll (even for an already-queued
+request), re-enabling immediately serves it.
 
 ## Irrigation scaled from 1 to 5 zones (2026-08-21)
 
